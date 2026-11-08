@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect x="5" y="17" width="70" height="46" rx="5"
+        fill="#F6F7F8" stroke="#BAC5CD" stroke-width="1.5"/>
+
+  <path d="M5 22 Q5 17 10 17 H70 Q75 17 75 22 V31 H5 Z"
+        fill="#2774AE"/>
+
+  <text x="11" y="27" fill="white"
+        font-family="Arial, sans-serif"
+        font-size="11" font-weight="bold">UCLA</text>
+
+  <rect x="11" y="38" width="19" height="19" rx="2"
+        fill="#B7C8D6"/>
+
+  <circle cx="20.5" cy="44" r="4" fill="#E4EBF0"/>
+  <path d="M13 55 Q20.5 44 28 55" fill="#E4EBF0"/>
+
+  <path d="M36 42 H66 M36 48 H61 M36 54 H56"
+        stroke="#8497A7" stroke-width="2"
+        stroke-linecap="round"/>
+</svg>

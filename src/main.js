@@ -4,6 +4,8 @@ import './style.css';
 import { Elevator } from './world/elevator.js';
 import { createElevatorReflectionEnvironment } from './world/elevator_interior.js';
 import { Player } from './player/player.js';
+import { Inventory } from './systems/inventory.js';
+import { Hotbar } from './ui/hotbar.js';
 
 // Scene
 const scene = new THREE.Scene();
@@ -37,6 +39,14 @@ scene.add(elevator.group);
 // Player/Player view
 const player = new Player(camera, renderer.domElement, elevator);
 
+// Inventory and HUD
+const inventory = new Inventory();
+const hotbar = new Hotbar(inventory);
+hotbar.render();
+
+hotbar.render();
+
+// Camera Pos
 camera.position.set(
   player.position.x,
   player.groundY + player.eyeHeight,
@@ -58,7 +68,9 @@ function animate() {
   requestAnimationFrame(animate);
 
   const delta = Math.min(clock.getDelta(), 0.05);
+
   player.updateMovement(delta);
+  player.updatePosture(delta);
 
   renderer.render(scene, camera);
 }

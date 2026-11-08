@@ -1,13 +1,7 @@
-// Note: Y = 0 is elevator baseline/floor 5 (ground level)
-
-// Elevator boundaries
-// -2 < x < 2
-// -1.9 < z < 1.9
-// 0 < y < 3.5
-// Doorway centered at x = 0, faces positive Z
 
 import * as THREE from 'three';
 
+// Player eye heights
 const standingHeight = 1.7;
 const crouchHeight = 1.3;
 const lowCrawlHeight = 0.3;
@@ -16,6 +10,7 @@ export class Player {
   constructor(camera, domElement, elevator) {
     this.camera = camera;
     this.domElement = domElement;
+    this.elevator = elevator;
 
     this.position = new THREE.Vector3(0, 0, 0);
 
@@ -24,143 +19,218 @@ export class Player {
 
     this.radius = 0.25;
     this.eyeHeight = standingHeight;
+    this.targetEyeHeight = standingHeight;
     this.groundY = 0;
 
     this.isLocked = false;
     this.keys = {};
 
+    // Movement speeds
     this.walkSpeed = 3.2;
     this.sprintSpeed = 5.5;
+    this.crouchSpeed = 1.8;
+    this.crawlSpeed = 0.8;
 
-    this.elevator = elevator;
+    // Posture: standing, crouching, prone
+    this.posture = "standing";
 
     this.setupMouseLook();
     this.setupKeyboard();
   }
 
-    setupMouseLook() {
+  setupMouseLook() {
     this.camera.rotation.order = 'YXZ';
 
     // Lock mouse when clicking the game
     this.domElement.addEventListener("click", () => {
-        if (!this.isLocked) {
+      if (!this.isLocked) {
         this.domElement.requestPointerLock();
-        }
+      }
     });
 
-    // Check whether mouse is locked
     document.addEventListener("pointerlockchange", () => {
-        this.isLocked = document.pointerLockElement === this.domElement;
+      this.isLocked =
+        document.pointerLockElement === this.domElement;
+
+      if (!this.isLocked) {
+        this.keys = {};
+      }
     });
 
-    // Rotate camera based on mouse movement
     document.addEventListener("mousemove", (event) => {
-        if (!this.isLocked) return;
+      if (!this.isLocked) return;
 
-        const sensitivity = 0.002;
+      const sensitivity = 0.002;
 
-        this.yaw -= event.movementX * sensitivity;
-        this.pitch -= event.movementY * sensitivity;
+      this.yaw -= event.movementX * sensitivity;
+      this.pitch -= event.movementY * sensitivity;
 
-        // Prevent looking too far up or down
-        this.pitch = THREE.MathUtils.clamp(
+      this.pitch = THREE.MathUtils.clamp(
         this.pitch,
         -Math.PI / 2 + 0.05,
         Math.PI / 2 - 0.05
-        );
+      );
 
-        this.camera.rotation.set(this.pitch, this.yaw, 0);
+      this.camera.rotation.set(this.pitch, this.yaw, 0);
     });
 
-    // Face elevator doors when starting
+    // Face elevator doors on startup
     this.camera.rotation.set(this.pitch, this.yaw, 0);
+  }
+
+  setupKeyboard() {
+    document.addEventListener("keydown", (event) => {
+      this.keys[event.code] = true;
+
+      if (!this.isLocked) return;
+
+      // Prevent browser behavior for gameplay keys
+      if (
+        event.code === "Space" ||
+        event.code === "ControlLeft" ||
+        event.code === "ControlRight"
+      ) {
+        event.preventDefault();
+      }
+
+      // Only toggle once per keypress
+      if (event.repeat) return;
+
+      // C: toggle crouch
+      if (
+        event.code === "KeyC"
+      ) {
+        this.posture =
+          this.posture === "crouching"
+            ? "standing"
+            : "crouching";
+      }
+
+      // Z: toggle prone
+      if (event.code === "KeyZ") {
+        this.posture =
+          this.posture === "prone"
+            ? "standing"
+            : "prone";
+      }
+
+      // Space: return to standing
+      if (event.code === "Space") {
+        this.posture = "standing";
+      }
+    });
+
+    document.addEventListener("keyup", (event) => {
+      this.keys[event.code] = false;
+    });
+
+    window.addEventListener("blur", () => {
+      this.keys = {};
+    });
+  }
+
+  updateMovement(delta) {
+    if (!this.isLocked) return;
+
+    // Movement relative to camera yaw
+    const forward = new THREE.Vector3(
+      -Math.sin(this.yaw),
+      0,
+      -Math.cos(this.yaw)
+    );
+
+    const right = new THREE.Vector3(
+      Math.cos(this.yaw),
+      0,
+      -Math.sin(this.yaw)
+    );
+
+    const direction = new THREE.Vector3();
+
+    if (this.keys.KeyW) direction.add(forward);
+    if (this.keys.KeyS) direction.sub(forward);
+    if (this.keys.KeyD) direction.add(right);
+    if (this.keys.KeyA) direction.sub(right);
+
+    // Normalize diagonal movement
+    if (direction.lengthSq() > 0) {
+      direction.normalize();
     }
 
-    setupKeyboard() {
-        document.addEventListener("keydown", (event) => {
-            this.keys[event.code] = true;
-        });
+    const sprinting =
+      this.keys.ShiftLeft || this.keys.ShiftRight;
 
-        document.addEventListener("keyup", (event) => {
-            this.keys[event.code] = false;
-        });
+    // Choose speed based on posture
+    let speed = this.walkSpeed;
 
-        window.addEventListener("blur", () => {
-            this.keys = {};
-        });
+    if (this.posture === "prone") {
+      speed = this.crawlSpeed;
+    } else if (this.posture === "crouching") {
+      speed = this.crouchSpeed;
+    } else if (sprinting) {
+      speed = this.sprintSpeed;
     }
 
+    this.position.addScaledVector(direction, speed * delta);
 
-    updateMovement(delta) {
-        // Don't move when the mouse is unlocked
-        if (!this.isLocked) return;
+    // Keep player inside elevator
+    this.checkCollision();
 
-        // Forward direction based on where the player is facing
-        const forward = new THREE.Vector3(
-            -Math.sin(this.yaw),
-            0,
-            -Math.cos(this.yaw)
-        );
+    // Update horizontal camera position
+    this.camera.position.x = this.position.x;
+    this.camera.position.z = this.position.z;
+  }
 
-        const right = new THREE.Vector3(
-            Math.cos(this.yaw),
-            0,
-            -Math.sin(this.yaw)
-        );
+  checkCollision() {
+    if (!this.elevator) return;
 
-        const direction = new THREE.Vector3();
+    const halfWidth = this.elevator.width / 2;
+    const halfDepth = this.elevator.depth / 2;
+    const wallThickness = this.elevator.thickness;
 
-        // WASD input
-        if (this.keys.KeyW) direction.add(forward);
-        if (this.keys.KeyS) direction.sub(forward);
-        if (this.keys.KeyD) direction.add(right);
-        if (this.keys.KeyA) direction.sub(right);
+    const maxX =
+      halfWidth - wallThickness - this.radius;
 
-        // Prevent diagonal movement from being faster
-        if (direction.lengthSq() > 0) {
-            direction.normalize();
-        }
+    const maxZ =
+      halfDepth - wallThickness - this.radius;
 
-        // Sprint when holding Shift
-        const sprinting = this.keys.ShiftLeft || this.keys.ShiftRight;
-        const speed = sprinting ? this.sprintSpeed : this.walkSpeed;
+    this.position.x = THREE.MathUtils.clamp(
+      this.position.x,
+      -maxX,
+      maxX
+    );
 
-        // Move player based on elapsed time
-        this.position.addScaledVector(direction, speed * delta);
-        this.checkCollision();
+    this.position.z = THREE.MathUtils.clamp(
+      this.position.z,
+      -maxZ,
+      maxZ
+    );
+  }
 
-        // Update camera position
-        this.camera.position.set(
-            this.position.x,
-            this.groundY + this.eyeHeight,
-            this.position.z
-        );
+  updatePosture(delta) {
+    // Determine target height
+    if (this.posture === "crouching") {
+      this.targetEyeHeight = crouchHeight;
+    } else if (this.posture === "prone") {
+      this.targetEyeHeight = lowCrawlHeight;
+    } else {
+      this.targetEyeHeight = standingHeight;
     }
 
-    
-    checkCollision() {
-        if (!this.elevator) return;
+    // Smooth height transition
+    const transitionSpeed = 5;
+    const step = transitionSpeed * delta;
+    const difference =
+      this.targetEyeHeight - this.eyeHeight;
 
-        const halfWidth = this.elevator.width / 2;
-        const halfDepth = this.elevator.depth / 2;
-        const wallThickness = this.elevator.thickness;
-
-        // Account for wall thickness and player width
-        const maxX = halfWidth - wallThickness - this.radius;
-        const maxZ = halfDepth - wallThickness - this.radius;
-
-        this.position.x = THREE.MathUtils.clamp(
-            this.position.x,
-            -maxX,
-            maxX
-        );
-
-        this.position.z = THREE.MathUtils.clamp(
-            this.position.z,
-            -maxZ,
-            maxZ
-        );
+    if (Math.abs(difference) <= step) {
+      this.eyeHeight = this.targetEyeHeight;
+    } else {
+      this.eyeHeight += Math.sign(difference) * step;
     }
 
-
+    // Update vertical camera position
+    this.camera.position.y =
+      this.groundY + this.eyeHeight;
+  }
 }
