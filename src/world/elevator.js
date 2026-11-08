@@ -18,10 +18,14 @@ export class Elevator {
     this.createShell();
     this.createDoors();
 
+    // Door animation
+    this.doorState = 'closed';
+    this.doorProgress = 0;
+    this.doorSpeed = 0.65;
+
     this.interior = createElevatorInterior(this);
     this.group.add(this.interior);
 
-    // Elevator control panel and floor display
     this.controls = createElevatorControls(this);
   }
 
@@ -52,22 +56,26 @@ export class Elevator {
         new THREE.BoxGeometry(w, h, d),
         material
       );
+
       mesh.position.set(x, y, z);
       return mesh;
     }
 
+    // Floor
     this.group.add(box(
       width, thickness, depth,
       floorMaterial,
       0, -thickness / 2, 0
     ));
 
+    // Ceiling
     this.group.add(box(
       width, thickness, depth,
       ceilingMaterial,
       0, height + thickness / 2, 0
     ));
 
+    // Back wall
     this.group.add(box(
       width, height, thickness,
       wallMaterial,
@@ -75,6 +83,7 @@ export class Elevator {
       -depth / 2 + thickness / 2
     ));
 
+    // Side walls
     this.group.add(box(
       thickness, height, depth,
       wallMaterial,
@@ -93,25 +102,47 @@ export class Elevator {
     const headerHeight = height - doorHeight;
     const frontZ = depth / 2 - thickness / 2;
 
+    // Original front walls
     this.group.add(box(
       sideWidth, doorHeight, thickness,
       wallMaterial,
       -(doorWidth + sideWidth) / 2,
-      doorHeight / 2, frontZ
+      doorHeight / 2,
+      frontZ
     ));
 
     this.group.add(box(
       sideWidth, doorHeight, thickness,
       wallMaterial,
       (doorWidth + sideWidth) / 2,
-      doorHeight / 2, frontZ
+      doorHeight / 2,
+      frontZ
     ));
 
+    // Above the doors
     this.group.add(box(
       width, headerHeight, thickness,
       wallMaterial,
-      0, doorHeight + headerHeight / 2, frontZ
+      0,
+      doorHeight + headerHeight / 2,
+      frontZ
     ));
+
+    // Hallway-side wall extensions
+    const outerWallDepth = 0.16;
+    const outerWallZ = depth / 2 + outerWallDepth / 2;
+
+    for (const side of [-1, 1]) {
+      this.group.add(box(
+        sideWidth,
+        doorHeight,
+        outerWallDepth,
+        wallMaterial,
+        side * (doorWidth + sideWidth) / 2,
+        doorHeight / 2,
+        outerWallZ
+      ));
+    }
   }
 
   createDoors() {
@@ -123,8 +154,9 @@ export class Elevator {
     const panelWidth = (doorWidth - gap) / 2;
     const panelThickness = 0.05;
 
+    // Recess the doors toward the hallway
     const doorZ =
-      depth / 2 - thickness - panelThickness / 2 - 0.01;
+      depth / 2 - thickness - panelThickness / 2 + 0.045;
 
     const doorMaterial = new THREE.MeshStandardMaterial({
       color: 0xb6bcc2,
@@ -166,6 +198,7 @@ export class Elevator {
     this.group.add(this.leftDoor);
     this.group.add(this.rightDoor);
 
+    // Center seam
     const seamMaterial = new THREE.MeshBasicMaterial({
       color: 0x050608
     });
@@ -182,12 +215,59 @@ export class Elevator {
     this.doorSeam.position.set(
       0,
       doorHeight / 2,
-      doorZ + panelThickness / 2 + 0.005
+      doorZ - panelThickness / 2 - 0.005
     );
 
     this.group.add(this.doorSeam);
 
+    // Save closed positions
     this.leftDoorClosedX = this.leftDoor.position.x;
     this.rightDoorClosedX = this.rightDoor.position.x;
+  }
+
+  openDoors() {
+    if (this.doorState === 'open') return;
+    this.doorState = 'opening';
+  }
+
+  closeDoors() {
+    if (this.doorState === 'closed') return;
+    this.doorState = 'closing';
+  }
+
+  update(delta) {
+    if (this.doorState === 'opening') {
+      this.doorProgress += delta * this.doorSpeed;
+
+      if (this.doorProgress >= 1) {
+        this.doorProgress = 1;
+        this.doorState = 'open';
+      }
+    }
+
+    if (this.doorState === 'closing') {
+      this.doorProgress -= delta * this.doorSpeed;
+
+      if (this.doorProgress <= 0) {
+        this.doorProgress = 0;
+        this.doorState = 'closed';
+      }
+    }
+
+    // Smooth start and stop
+    const t = this.doorProgress;
+    const eased = t * t * (3 - 2 * t);
+
+    // Slide into the side walls
+    const travel = this.doorWidth / 2;
+
+    this.leftDoor.position.x =
+      this.leftDoorClosedX - travel * eased;
+
+    this.rightDoor.position.x =
+      this.rightDoorClosedX + travel * eased;
+
+    // Hide seam when opening
+    this.doorSeam.visible = this.doorProgress < 0.01;
   }
 }
