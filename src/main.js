@@ -6,6 +6,7 @@ import { createElevatorReflectionEnvironment } from './world/elevator_interior.j
 import { Player } from './player/player.js';
 import { Inventory } from './systems/inventory.js';
 import { Hotbar } from './ui/hotbar.js';
+import { Interaction } from './systems/interactions.js';
 
 // Scene
 const scene = new THREE.Scene();
@@ -32,6 +33,19 @@ renderer.toneMappingExposure = 1.1;
 
 document.querySelector('#app').appendChild(renderer.domElement);
 
+ // Crosshair
+const crosshair = document.createElement('div');
+crosshair.id = 'crosshair';
+document.body.appendChild(crosshair);
+
+// Interaction prompt
+const interactPrompt = document.createElement('div');
+interactPrompt.id = 'interact-prompt';
+interactPrompt.innerHTML = '<span>F</span> Interact';
+document.body.appendChild(interactPrompt);
+
+
+
 // Elevator
 const elevator = new Elevator();
 scene.add(elevator.group);
@@ -46,6 +60,38 @@ hotbar.render();
 
 hotbar.render();
 
+// Object interactions
+const interaction = new Interaction(camera, scene, (data, object) => {
+  console.log('Interacted with:', data.id || data.kind);
+
+  if (data.kind === 'elevatorButton') {
+    if (data.action === 'floor') {
+      elevator.controls.buttons[data.id]?.userData.setLit?.(true);
+      console.log(`Floor ${data.floor} selected`);
+    }
+
+    if (data.action === 'doorOpen') {
+      console.log('Open doors');
+    }
+
+    if (data.action === 'doorClose') {
+      console.log('Close doors');
+    }
+
+    if (data.action === 'alarm') {
+      console.log('Alarm pressed');
+    }
+
+    if (data.action === 'help') {
+      console.log('Help pressed');
+    }
+  }
+
+  if (data.kind === 'firePanel') {
+    console.log('Firefighter panel inspected');
+  }
+});
+
 // Camera Pos
 camera.position.set(
   player.position.x,
@@ -53,13 +99,9 @@ camera.position.set(
   player.position.z
 );
 
-// Ambient fill light (NEW)
+// Ambient fill light
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambientLight);
-
-// Debugging helpers
-scene.add(new THREE.AxesHelper(2));
-scene.add(new THREE.GridHelper(10, 10));
 
 const clock = new THREE.Clock();
 
@@ -71,6 +113,21 @@ function animate() {
 
   player.updateMovement(delta);
   player.updatePosture(delta);
+
+  // Check what the player is looking at
+  const target = interaction.update();
+
+  crosshair.classList.toggle('active', !!target);
+  interactPrompt.style.display = target ? 'block' : 'none';
+
+  if (target) {
+    const data = target.userData;
+
+    // Show the object's label
+    const label = data.label || data.id || 'Interact';
+    interactPrompt.innerHTML = `<span>F</span> ${label}`;
+  }
+
 
   renderer.render(scene, camera);
 }

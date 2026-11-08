@@ -105,3 +105,51 @@ canvas {
   width: 36px;
   height: 36px;
 }
+
+
+/* Crosshair */
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: #eeeeee;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 100;
+  transition: all 0.15s ease;
+}
+
+/* Highlight when looking at something */
+#crosshair.active {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border: 2px solid #e6d6a5;
+  box-shadow: 0 0 8px #e6d6a566;
+}
+
+/* Interaction prompt */
+#interact-prompt {
+  position: fixed;
+  top: calc(50% + 25px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(12, 14, 18, 0.88);
+  border: 1px solid #555b65;
+  border-radius: 5px;
+  padding: 6px 12px;
+  color: #eeeeee;
+  font: 13px monospace;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+}
+
+#interact-prompt span {
+  color: #e6d6a5;
+  font-weight: bold;
+  margin-right: 6px;
+}
