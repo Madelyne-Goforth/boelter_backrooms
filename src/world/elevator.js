@@ -6,6 +6,8 @@ export class Elevator {
   constructor() {
     this.group = new THREE.Group();
 
+    this.currentFloor = 'floor n∊ℕ';
+
     this.width = 4.2;
     this.height = 3.5;
     this.depth = 4.0;
@@ -16,6 +18,7 @@ export class Elevator {
 
     this.createShell();
     this.createDoors();
+    this.createButtons();
 
     this.interior = createElevatorInterior(this);
     this.group.add(this.interior);
@@ -198,4 +201,168 @@ export class Elevator {
     this.leftDoorClosedX = this.leftDoor.position.x;
     this.rightDoorClosedX = this.rightDoor.position.x;
   }
+
+  createButtons() {
+  this.buttons = [];
+
+  // This group holds the whole control panel.
+  const controls = new THREE.Group();
+
+  // Place it beside the doors, facing inside the cabin.
+  controls.position.set(
+    (this.width + this.doorWidth) / 4,
+    0,
+    this.depth / 2 - this.thickness - 0.015
+  );
+
+  // Turn its front toward the inside of the elevator.
+  controls.rotation.y = Math.PI;
+  this.group.add(controls);
+
+  const metal = new THREE.MeshStandardMaterial({
+    color: 0x999b98,
+    metalness: 0.75,
+    roughness: 0.4
+  });
+
+  const silver = new THREE.MeshStandardMaterial({
+    color: 0xd0d0cc,
+    metalness: 0.85,
+    roughness: 0.25
+  });
+
+  const black = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6
+  });
+
+  // Tall metal backing.
+  const panel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.68, 2.75, 0.025),
+    metal
+  );
+
+  panel.position.set(0, 1.45, 0);
+  controls.add(panel);
+
+  // Draw text on a small flat surface.
+  function makeLabel(text, width, height, color = '#ffffff') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.font = 'bold 110px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 256, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    return new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false
+      })
+    );
+  }
+
+  const rows = [
+    ['8', '9'],
+    ['6', '7'],
+    ['4', '5'],
+    ['★2', '3'],
+    ['◀ | ▶', '▶ | ◀'],
+    ['BELL', 'HELP']
+  ];
+
+  rows.forEach((row, rowIndex) => {
+    row.forEach((text, columnIndex) => {
+      const x = columnIndex === 0 ? -0.155 : 0.155;
+      const y = 1.42 - rowIndex * 0.16;
+
+      // Silver backing around the label and button.
+      const backing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.285, 0.125, 0.018),
+        silver
+      );
+
+      backing.position.set(x, y, 0.025);
+      controls.add(backing);
+
+      // Black area behind the number.
+      const labelBackground = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.105, 0.01),
+        black
+      );
+
+      labelBackground.position.set(x - 0.055, y, 0.04);
+      controls.add(labelBackground);
+
+      const label = makeLabel(text, 0.2, 0.15);
+      label.position.set(x - 0.055, y, 0.047);
+      controls.add(label);
+
+      // Outer silver ring.
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.053, 0.053, 0.022, 32),
+        silver
+      );
+
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(x + 0.075, y, 0.045);
+      controls.add(ring);
+
+      // Actual pressable button.
+      const button = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.039, 0.039, 0.026, 32),
+        metal.clone()
+      );
+
+      button.rotation.x = Math.PI / 2;
+      button.position.set(x + 0.075, y, 0.059);
+
+      if (rowIndex < 4) {
+        button.userData.floor = Number(text.replace('★', ''));
+        button.userData.action = 'floor';
+      } else {
+        button.userData.action = [
+          ['open', 'close'],
+          ['alarm', 'help']
+        ][rowIndex - 4][columnIndex];
+      }
+
+      controls.add(button);
+      this.buttons.push(button);
+    });
+  });
+
+  // Floor display above the buttons.
+  const display = new THREE.Mesh(
+    new THREE.BoxGeometry(0.48, 0.3, 0.02),
+    black
+  );
+
+  display.position.set(0, 2.45, 0.025);
+  controls.add(display);
+
+  const floorNumber = makeLabel(this.currentFloor, 0.4, 0.22, '#8cff98');
+  floorNumber.position.set(0, 2.45, 0.038);
+  controls.add(floorNumber);
+
+  // Speaker slots above the button rows.
+  for (let i = 0; i < 5; i++) {
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.19, 0.008, 0.005),
+      black
+    );
+
+    slot.position.set(0, 1.75 - i * 0.025, 0.016);
+    controls.add(slot);
+  }
+}
 }
