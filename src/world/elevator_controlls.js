@@ -320,21 +320,35 @@ export function createElevatorControls(elevator) {
     }
   });
 
-  function openFirePanel() {
-    if (firePanel.open) return;
+// Firefighter panel animation
+let firePanelTarget = 0;
 
-    firePanel.open = true;
-    hinge.rotation.y = -Math.PI * 0.7;
-    secretButton.userData.interactable = true;
-  }
+function openFirePanel() {
+  if (firePanel.open) return;
 
-  function closeFirePanel() {
-    if (!firePanel.open) return;
+  firePanel.open = true;
+  firePanel.locked = false;
 
-    firePanel.open = false;
-    hinge.rotation.y = 0;
-    secretButton.userData.interactable = false;
-  }
+  // Open toward the elevator interior
+  firePanelTarget = -Math.PI * 0.7;
+
+  secretButton.userData.interactable = true;
+}
+
+function closeFirePanel() {
+  if (!firePanel.open) return;
+
+  firePanel.open = false;
+  firePanelTarget = 0;
+  secretButton.userData.interactable = false;
+}
+
+function updateFirePanel(delta) {
+  const difference = firePanelTarget - hinge.rotation.y;
+
+  hinge.rotation.y +=
+    difference * Math.min(1, delta * 7);
+}
 
   // Circular speaker
   function createRoundSpeaker(y) {
@@ -578,6 +592,7 @@ export function createElevatorControls(elevator) {
     firePanel,
     fireDoor,
     openFirePanel,
-    closeFirePanel
+    closeFirePanel,
+    updateFirePanel
   };
 }

@@ -11,11 +11,14 @@ import { Interaction } from './systems/interactions.js';
 import { Dialogue } from './ui/dialogue.js';
 import { Phone } from './ui/phone.js';
 import './ui/phone.css';
+import { ElevatorLevel } from './world/elevator_level.js';
+
 
 // Scene
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.environment = createElevatorReflectionEnvironment();
+
 
 // Camera
 const camera = new THREE.PerspectiveCamera(
@@ -25,6 +28,7 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
+
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -33,10 +37,12 @@ renderer.toneMappingExposure = 1.1;
 
 document.querySelector('#app').appendChild(renderer.domElement);
 
+
 // Crosshair
 const crosshair = document.createElement('div');
 crosshair.id = 'crosshair';
 document.body.appendChild(crosshair);
+
 
 // Interaction prompt
 const interactPrompt = document.createElement('div');
@@ -44,9 +50,11 @@ interactPrompt.id = 'interact-prompt';
 interactPrompt.innerHTML = '<span>F</span> Interact';
 document.body.appendChild(interactPrompt);
 
+
 // Elevator
 const elevator = new Elevator();
 scene.add(elevator.group);
+
 
 // Player
 const player = new Player(
@@ -55,6 +63,7 @@ const player = new Player(
   elevator
 );
 
+
 // Camera position
 camera.position.set(
   player.position.x,
@@ -62,10 +71,17 @@ camera.position.set(
   player.position.z
 );
 
+
 // Inventory and HUD
 const inventory = new Inventory();
 const hotbar = new Hotbar(inventory);
 hotbar.render();
+
+// Update hotbar when items are added or removed
+inventory.onChange = () => {
+  hotbar.render();
+};
+
 
 // Dialogue
 const dialogue = new Dialogue({
@@ -76,6 +92,7 @@ const dialogue = new Dialogue({
     player.keys = {};
   }
 });
+
 
 // In-game clock
 class GameClock {
@@ -95,6 +112,15 @@ class GameClock {
 
 const gameClock = new GameClock();
 
+
+const elevatorLevel = new ElevatorLevel({
+  elevator,
+  inventory,
+  dialogue,
+  onInventoryChange: () => hotbar.render()
+});
+
+
 // Camera-mounted flashlight
 const flashlight = new THREE.SpotLight(
   0xffffff,
@@ -112,6 +138,7 @@ flashlight.visible = false;
 camera.add(flashlight);
 camera.add(flashlight.target);
 scene.add(camera);
+
 
 // Phone
 const phone = new Phone(
@@ -137,6 +164,7 @@ const phone = new Phone(
   gameClock
 );
 
+
 // Check whether the player is typing
 function isTyping(event) {
   const element = event.target;
@@ -157,6 +185,7 @@ function isTyping(event) {
 
   return false;
 }
+
 
 // Phone keyboard controls
 function handlePhoneKeys(event) {
@@ -205,8 +234,10 @@ function handlePhoneKeys(event) {
   }
 }
 
+
 // Capture keyboard events before game listeners
 window.addEventListener('keydown', handlePhoneKeys, true);
+
 
 // Prevent game controls when typing in phone
 window.addEventListener('keyup', (event) => {
@@ -215,6 +246,7 @@ window.addEventListener('keyup', (event) => {
     event.stopImmediatePropagation();
   }
 }, true);
+
 
 // Object interactions
 const interaction = new Interaction(
@@ -227,24 +259,57 @@ const interaction = new Interaction(
 
     console.log('Interacted with:', data.id || data.kind);
 
+    if (elevatorLevel.interact(data)) {
+      return;
+    }
+
     // Elevator buttons
     if (data.kind === 'elevatorButton') {
       if (data.action === 'floor') {
-        const button = elevator.controls.buttons[data.id];
+        if (elevatorLevel.phase !== 'ready') {
+          dialogue.show([
+            "The elevator isn't responding."
+          ], 'ELEVATOR', 'SYSTEM');
 
-        if (button && button.userData.setLit) {
-          button.userData.setLit(true);
+          return;
         }
 
-        console.log(`Floor ${data.floor} selected`);
+        const button = elevator.controls.buttons[data.id];
+
+        if (data.floor === 2) {
+          if (button && button.userData.setLit) {
+            button.userData.setLit(true);
+          }
+
+          elevatorLevel.start();
+        } else {
+          dialogue.show([
+            "The elevator doesn't respond.",
+            "Maybe I should try Floor 2."
+          ], 'ELEVATOR', 'SYSTEM');
+        }
       }
 
       if (data.action === 'doorOpen') {
-        elevator.openDoors();
+        if (elevatorLevel.phase === 'ready') {
+          elevator.openDoors();
+        } else {
+          dialogue.show([
+            "The doors won't open."
+          ], 'ELEVATOR', 'SYSTEM');
+        }
       }
 
       if (data.action === 'doorClose') {
-        elevator.closeDoors();
+        if (elevatorLevel.phase === 'ready') {
+          elevator.closeDoors();
+        } else {
+          dialogue.show(
+            ["The doors aren't responding"],
+            'ELEVATOR',
+            'SYSTEM'
+          );
+        }
       }
 
       if (data.action === 'alarm') {
@@ -274,15 +339,15 @@ const interaction = new Interaction(
 
     // Firefighter panel
     if (data.kind === 'firePanel') {
-      dialogue.show([
-        "A locked firefighter's access panel.",
-        "There's a small keyhole.",
-        "Probably not something I should mess with.",
-        "...Probably."
-      ]);
+      elevatorLevel.interact({
+        kind: 'elevatorPuzzle',
+        id: 'puzzlePanel'
+      });
+      return;
     }
   }
 );
+
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(
@@ -292,8 +357,10 @@ const ambientLight = new THREE.AmbientLight(
 
 scene.add(ambientLight);
 
+
 const clock = new THREE.Clock();
 let phoneTimeUpdate = 0;
+
 
 // Animation loop
 function animate() {
@@ -320,6 +387,7 @@ function animate() {
 
   // Elevator door animation
   elevator.update(delta);
+  elevatorLevel.update(delta);
 
   // Check UI state
   let uiOpen = false;
@@ -378,6 +446,7 @@ function animate() {
 }
 
 animate();
+
 
 // Resize
 window.addEventListener('resize', () => {
