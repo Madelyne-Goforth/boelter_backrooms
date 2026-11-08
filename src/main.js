@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import './style.css';
 import { Elevator } from './world/elevator.js';
 import { createElevatorReflectionEnvironment } from './world/elevator_interior.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Player } from './player/player.js';
 
 // Scene
 const scene = new THREE.Scene();
@@ -34,26 +34,32 @@ document.querySelector('#app').appendChild(renderer.domElement);
 const elevator = new Elevator();
 scene.add(elevator.group);
 
+// Player/Player view
+const player = new Player(camera, renderer.domElement, elevator);
+
+camera.position.set(
+  player.position.x,
+  player.groundY + player.eyeHeight,
+  player.position.z
+);
+
 // Ambient fill light (NEW)
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambientLight);
-
-// Temporary modeling camera
-camera.position.set(0, 1.7, 0);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.7, 1); // FIX: Look toward doors (+Z)
-controls.update();
 
 // Debugging helpers
 scene.add(new THREE.AxesHelper(2));
 scene.add(new THREE.GridHelper(10, 10));
 
+const clock = new THREE.Clock();
+
 // Animation loop
 function animate() {
   requestAnimationFrame(animate);
 
-  controls.update();
+  const delta = Math.min(clock.getDelta(), 0.05);
+  player.updateMovement(delta);
+
   renderer.render(scene, camera);
 }
 
