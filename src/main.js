@@ -9,6 +9,8 @@ import { Inventory } from './systems/inventory.js';
 import { Hotbar } from './ui/hotbar.js';
 import { Interaction } from './systems/interactions.js';
 import { Dialogue } from './ui/dialogue.js';
+import { Phone } from './ui/phone.js';
+import './ui/phone.css';
 
 // Scene
 const scene = new THREE.Scene();
@@ -75,19 +77,164 @@ const dialogue = new Dialogue({
   }
 });
 
+// In-game clock
+class GameClock {
+  constructor() {
+    this.time = new Date(2026, 10, 7, 21, 41, 0).getTime();
+    this.speed = 1;
+  }
+
+  update(delta) {
+    this.time += delta * 1000 * this.speed;
+  }
+
+  getDate() {
+    return new Date(this.time);
+  }
+}
+
+const gameClock = new GameClock();
+
+// Camera-mounted flashlight
+const flashlight = new THREE.SpotLight(
+  0xffffff,
+  15,
+  22,
+  Math.PI / 7,
+  0.45,
+  1.2
+);
+
+flashlight.position.set(0, -0.12, -0.15);
+flashlight.target.position.set(0, -0.12, -8);
+flashlight.visible = false;
+
+camera.add(flashlight);
+camera.add(flashlight.target);
+scene.add(camera);
+
+// Phone
+const phone = new Phone(
+  // Phone opens
+  () => {
+    player.keys = {};
+
+    if (document.pointerLockElement !== null) {
+      document.exitPointerLock();
+    }
+  },
+
+  // Phone closes
+  () => {
+    player.keys = {};
+  },
+
+  // Flashlight changes
+  (enabled) => {
+    flashlight.visible = enabled;
+  },
+
+  gameClock
+);
+
+// Check whether the player is typing
+function isTyping(event) {
+  const element = event.target;
+
+  if (element instanceof HTMLElement) {
+    if (element.tagName === 'INPUT') {
+      return true;
+    }
+
+    if (element.tagName === 'TEXTAREA') {
+      return true;
+    }
+
+    if (element.isContentEditable) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Phone keyboard controls
+function handlePhoneKeys(event) {
+  // Allow typing inside phone inputs
+  if (isTyping(event)) {
+    return;
+  }
+
+  if (event.repeat) {
+    return;
+  }
+
+  // Phone is open
+  if (phone.isOpen) {
+    if (event.code === 'KeyE' || event.code === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      phone.close();
+      return;
+    }
+
+    // Prevent other game keyboard controls
+    event.stopImmediatePropagation();
+    return;
+  }
+
+  // Open phone with E
+  if (event.code === 'KeyE') {
+    if (dialogue.active) {
+      return;
+    }
+
+    const selectedItem = inventory.getSelectedItem();
+
+    if (selectedItem === null) {
+      return;
+    }
+
+    if (selectedItem.id === 'phone') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      phone.open();
+    }
+  }
+}
+
+// Capture keyboard events before game listeners
+window.addEventListener('keydown', handlePhoneKeys, true);
+
+// Prevent game controls when typing in phone
+window.addEventListener('keyup', (event) => {
+  if (phone.isOpen) {
+    player.keys = {};
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 // Object interactions
 const interaction = new Interaction(
   camera,
   scene,
   (data, object) => {
-    if (dialogue.active) return;
+    if (dialogue.active || phone.isOpen) {
+      return;
+    }
 
     console.log('Interacted with:', data.id || data.kind);
 
     // Elevator buttons
     if (data.kind === 'elevatorButton') {
       if (data.action === 'floor') {
-        elevator.controls.buttons[data.id]?.userData.setLit?.(true);
+        const button = elevator.controls.buttons[data.id];
+
+        if (button && button.userData.setLit) {
+          button.userData.setLit(true);
+        }
 
         console.log(`Floor ${data.floor} selected`);
       }
@@ -142,9 +289,11 @@ const ambientLight = new THREE.AmbientLight(
   0xffffff,
   0.35
 );
+
 scene.add(ambientLight);
 
 const clock = new THREE.Clock();
+let phoneTimeUpdate = 0;
 
 // Animation loop
 function animate() {
@@ -152,34 +301,77 @@ function animate() {
 
   const delta = Math.min(clock.getDelta(), 0.05);
 
-  // Pause movement during dialogue
-  if (!dialogue.active) {
+  // Update game time
+  gameClock.update(delta);
+
+  // Update phone clock every second
+  phoneTimeUpdate += delta;
+
+  if (phoneTimeUpdate >= 1) {
+    phone.updateTime();
+    phoneTimeUpdate = 0;
+  }
+
+  // Pause movement while UI is open
+  if (!dialogue.active && !phone.isOpen) {
     player.updateMovement(delta);
     player.updatePosture(delta);
   }
 
+  // Elevator door animation
   elevator.update(delta);
 
+  // Check UI state
+  let uiOpen = false;
+
+  if (dialogue.active || phone.isOpen) {
+    uiOpen = true;
+  }
+
   // Object detection
-  const target = dialogue.active
-    ? null
-    : interaction.update();
+  let target = null;
 
-  crosshair.style.display = dialogue.active
-    ? 'none'
-    : 'block';
+  if (!uiOpen) {
+    target = interaction.update();
+  }
 
-  crosshair.classList.toggle('active', !!target);
-
-  interactPrompt.style.display = target
-    ? 'block'
-    : 'none';
+  // Crosshair
+  if (uiOpen) {
+    crosshair.style.display = 'none';
+  } else {
+    crosshair.style.display = 'block';
+  }
 
   if (target) {
-    const data = target.userData;
-    const label = data.label || data.id || 'Interact';
+    crosshair.classList.add('active');
+  } else {
+    crosshair.classList.remove('active');
+  }
 
-    interactPrompt.innerHTML = `<span>F</span> ${label}`;
+  // Interaction prompt
+  if (target) {
+    const data = target.userData;
+    let label = 'Interact';
+
+    if (data.label) {
+      label = data.label;
+    } else if (data.id) {
+      label = data.id;
+    }
+
+    interactPrompt.textContent = '';
+
+    const keyLabel = document.createElement('span');
+    keyLabel.textContent = 'F';
+
+    interactPrompt.appendChild(keyLabel);
+    interactPrompt.appendChild(
+      document.createTextNode(' ' + label)
+    );
+
+    interactPrompt.style.display = 'block';
+  } else {
+    interactPrompt.style.display = 'none';
   }
 
   renderer.render(scene, camera);

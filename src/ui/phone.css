@@ -1,0 +1,640 @@
+
+/* Phone overlay */
+#phone {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.48);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  pointer-events: auto;
+}
+
+#phone.visible {
+  display: flex;
+}
+
+#phone button,
+#phone input,
+#phone textarea {
+  font-family: inherit;
+}
+
+/* Aluminum frame */
+.phone-frame {
+  width: 310px;
+  height: 630px;
+  padding: 8px;
+  border: 3px solid #68747e;
+  border-radius: 43px;
+  background: #b8c1c9;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.75);
+  box-sizing: content-box;
+}
+
+/* SVG-inspired wallpaper */
+.phone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 34px;
+  background: linear-gradient(145deg, #101923, #294b65);
+  color: white;
+}
+
+.phone-screen::before {
+  content: '';
+  position: absolute;
+  width: 140%;
+  height: 48%;
+  left: -15%;
+  bottom: -10%;
+  background: rgba(65, 110, 141, 0.65);
+  border-radius: 55% 55% 0 0;
+  transform: rotate(-15deg);
+  pointer-events: none;
+}
+
+.phone-screen::after {
+  content: '';
+  position: absolute;
+  width: 145%;
+  height: 30%;
+  left: -15%;
+  bottom: -13%;
+  background: rgba(120, 163, 191, 0.25);
+  border-radius: 65% 65% 0 0;
+  transform: rotate(-12deg);
+  pointer-events: none;
+}
+
+/* Status bar */
+.phone-status {
+  position: absolute;
+  top: 15px;
+  left: 23px;
+  right: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+}
+
+.phone-control-trigger {
+  display: flex;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.phone-battery {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.phone-island {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82px;
+  height: 23px;
+  border-radius: 20px;
+  background: #05090d;
+  z-index: 11;
+}
+
+/* Phone content */
+.phone-body {
+  position: absolute;
+  inset: 49px 0 29px;
+  z-index: 2;
+}
+
+.phone-home {
+  position: relative;
+  height: 100%;
+  padding: 18px 16px;
+  box-sizing: border-box;
+}
+
+.phone-date {
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.phone-clock {
+  margin: 5px 0 38px;
+  text-align: center;
+  font-size: 52px;
+  font-weight: 300;
+  letter-spacing: -2px;
+}
+
+/* App icons */
+.phone-app-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px 8px;
+}
+
+.phone-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+}
+
+.phone-app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  background: #f0f1f3;
+  font-size: 28px;
+  color: #222;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.phone-app-icon img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.phone-app-name {
+  font-size: 10px;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.app-gmail {
+  background: #ffffff;
+}
+
+.app-canvas {
+  background: #ffffff;
+}
+
+.app-duo {
+  background: #ffffff;
+}
+
+.app-yikyak {
+  background: #ffffff;
+}
+
+.app-instagram {
+  background: linear-gradient(35deg, #f9ce34, #ee2a7b, #6228d7);
+}
+
+.app-linkedin {
+  background: #0a66c2;
+}
+
+.app-settings {
+  background: linear-gradient(#aab0b8, #6d7785);
+  color: white;
+}
+
+.app-camera {
+  background: #e9edf0;
+}
+
+.app-calls,
+.app-messages {
+  background: #34c759;
+  color: white;
+}
+
+.app-notes {
+  background: linear-gradient(#f5d24e 0 20%, #ffffff 20%);
+  color: #343434;
+}
+
+.app-photos {
+  background: white;
+  color: #e47d9b;
+}
+
+/* Bottom dock */
+.phone-dock {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 12px 7px;
+  border-radius: 21px;
+  background: rgba(210, 224, 234, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.phone-dock .phone-app-name {
+  display: none;
+}
+
+/* Home indicator */
+.phone-home-indicator {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 5px;
+  border: none;
+  border-radius: 10px;
+  background: #d4dee6;
+  cursor: pointer;
+  z-index: 20;
+}
+
+/* App screens */
+.phone-app-screen {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 13px 17px 24px;
+  background: #f5f5f7;
+  color: #151515;
+  overflow-y: auto;
+}
+
+.phone-app-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 30px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.phone-back {
+  border: none;
+  background: transparent;
+  color: #1478e8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.phone-app-content h2 {
+  font-size: 25px;
+  margin: 19px 0;
+}
+
+.phone-app-content h3 {
+  font-size: 15px;
+  margin: 22px 0 10px;
+}
+
+.phone-app-content p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.phone-muted {
+  color: #777;
+  font-size: 12px;
+}
+
+.phone-list-item,
+.phone-list-button {
+  display: block;
+  width: 100%;
+  padding: 14px 5px;
+  border: none;
+  border-bottom: 1px solid #d7d7dc;
+  background: transparent;
+  color: #222;
+  text-align: left;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.phone-list-button {
+  cursor: pointer;
+}
+
+.phone-list-button:hover {
+  background: #e8eaf0;
+}
+
+.phone-list-button strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.phone-list-button small,
+.phone-list-item small {
+  display: block;
+  margin-top: 4px;
+  color: #777;
+  font-size: 12px;
+}
+
+.phone-offline {
+  text-align: center;
+  margin-top: 95px;
+}
+
+/* Messages */
+.phone-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px 0;
+}
+
+.phone-bubble {
+  max-width: 78%;
+  padding: 10px 13px;
+  border-radius: 17px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.phone-bubble.them {
+  align-self: flex-start;
+  background: #e4e5ea;
+  color: #222;
+}
+
+.phone-bubble.me {
+  align-self: flex-end;
+  background: #34c759;
+  color: white;
+}
+
+.phone-conversation-actions button {
+  border: none;
+  background: transparent;
+  color: #1478e8;
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+.phone-message-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.phone-message-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #ccc;
+  border-radius: 15px;
+  padding: 9px;
+}
+
+.phone-message-form button,
+.phone-primary-button {
+  border: none;
+  border-radius: 12px;
+  background: #1478e8;
+  color: white;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.phone-primary-button {
+  margin-top: 16px;
+}
+
+/* Calls */
+.phone-call-screen {
+  text-align: center;
+  padding-top: 45px;
+}
+
+.phone-call-avatar {
+  font-size: 50px;
+}
+
+#phone-end-call {
+  margin-top: 50px;
+  padding: 14px 30px;
+  border: none;
+  border-radius: 30px;
+  background: #e53935;
+  color: white;
+  cursor: pointer;
+}
+
+/* Notes */
+.phone-note-title,
+.phone-note-text {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d4d4da;
+  border-radius: 9px;
+  box-sizing: border-box;
+  background: white;
+  color: #222;
+}
+
+.phone-note-title {
+  margin-top: 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.phone-note-text {
+  height: 260px;
+  margin-top: 12px;
+  resize: vertical;
+  font-size: 14px;
+}
+
+/* Photos */
+.phone-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.phone-photo-tile {
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+.phone-photo-tile span {
+  font-size: 42px;
+}
+
+.phone-photo-detail {
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  color: white;
+  font-size: 75px;
+}
+
+/* Control Center */
+.phone-control-center {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 25px 18px;
+  background: linear-gradient(#25354b, #101923);
+  color: white;
+}
+
+.phone-control-center h2 {
+  margin: 12px 0 30px;
+  font-size: 25px;
+}
+
+#phone-flashlight-toggle,
+.phone-control-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 18px;
+  border: none;
+  border-radius: 16px;
+  background: #35475e;
+  color: white;
+  text-align: left;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+#phone-flashlight-toggle {
+  cursor: pointer;
+}
+
+#phone-flashlight-toggle.enabled {
+  background: #f4d46a;
+  color: #202020;
+}
+
+.phone-flashlight-icon {
+  font-size: 27px;
+}
+
+
+/* Keep status indicators clear of Dynamic Island */
+.phone-status {
+  left: 23px;
+  right: 18px;
+  top: 15px;
+}
+
+.phone-control-trigger {
+  gap: 5px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.phone-signal {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.phone-battery {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* Local app icon styling */
+.phone-app-icon {
+  font-weight: 700;
+  font-size: 27px;
+  letter-spacing: -1px;
+}
+
+.app-gmail {
+  font-size: 33px;
+  font-weight: 900;
+}
+
+.app-canvas {
+  font-size: 36px;
+}
+
+.app-duo {
+  font-size: 33px;
+}
+
+.app-instagram {
+  font-size: 43px;
+  font-weight: 400;
+}
+
+.app-linkedin {
+  font-size: 26px;
+  letter-spacing: -2px;
+}
+
+.app-messages {
+  font-size: 34px;
+}
+
+/* Control Center navigation */
+.phone-control-back {
+  display: block;
+  margin-top: 20px;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: #dceeff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* Prevent long messages and notes from overflowing */
+.phone-list-button small,
+.phone-bubble,
+.phone-note-text {
+  overflow-wrap: anywhere;
+}
+
+.phone-note-text {
+  white-space: pre-wrap;
+}
+
+/* App icon images */
+.phone-app-icon {
+  background: transparent !important;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.phone-app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 13px;
+}
