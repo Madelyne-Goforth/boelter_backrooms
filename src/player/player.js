@@ -34,6 +34,8 @@ export class Player {
     // Posture: standing, crouching, prone
     this.posture = "standing";
 
+    this.colliders = [];  
+
     this.setupMouseLook();
     this.setupKeyboard();
   }
@@ -182,6 +184,10 @@ export class Player {
   }
 
   checkCollision() {
+    if (this.colliders.length) {
+      this.resolveCollisions();
+      return;
+    }
     if (!this.elevator) return;
 
     const halfWidth = this.elevator.width / 2;
@@ -232,5 +238,46 @@ export class Player {
     // Update vertical camera position
     this.camera.position.y =
       this.groundY + this.eyeHeight;
+  }
+
+  setColliders(list) {
+  this.colliders = list;
+}
+
+  resolveCollisions() {
+    const p = this.position;
+    const r = this.radius;
+
+    // a few passes so corners don't let you slip through
+    for (let pass = 0; pass < 3; pass++) {
+      for (const c of this.colliders) {
+        if (!c.solid) continue;
+        const b = c.box;
+
+        // closest point on the wall rectangle (top-down, ignoring y)
+        const cx = THREE.MathUtils.clamp(p.x, b.min.x, b.max.x);
+        const cz = THREE.MathUtils.clamp(p.z, b.min.z, b.max.z);
+        const dx = p.x - cx;
+        const dz = p.z - cz;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= r * r) continue;
+
+        if (d2 > 1e-8) {
+          const d = Math.sqrt(d2);
+          const push = (r - d) / d;
+          p.x += dx * push;
+          p.z += dz * push;
+        } else {
+          // center ended up inside the box: eject along the shortest way out
+          const opts = [
+            [p.x - b.min.x, () => (p.x = b.min.x - r)],
+            [b.max.x - p.x, () => (p.x = b.max.x + r)],
+            [p.z - b.min.z, () => (p.z = b.min.z - r)],
+            [b.max.z - p.z, () => (p.z = b.max.z + r)],
+          ];
+          opts.sort((a, b) => a[0] - b[0])[0][1]();
+        }
+      }
+    }
   }
 }

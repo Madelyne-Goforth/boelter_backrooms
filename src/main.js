@@ -12,6 +12,7 @@ import { Dialogue } from './ui/dialogue.js';
 import { Phone } from './ui/phone.js';
 import './ui/phone.css';
 import { ElevatorLevel } from './world/elevator_level.js';
+import { BoelterFloor } from './world/boelter_floor.js';
 
 
 // Scene
@@ -55,7 +56,6 @@ document.body.appendChild(interactPrompt);
 const elevator = new Elevator();
 scene.add(elevator.group);
 
-
 // Player
 const player = new Player(
   camera,
@@ -94,6 +94,12 @@ const dialogue = new Dialogue({
 });
 
 
+// Floor Two (needs elevator, player and dialogue to exist first)
+const floor = new BoelterFloor({ elevator, dialogue });
+scene.add(floor.group);
+player.setColliders(floor.colliders);
+
+
 // In-game clock
 class GameClock {
   constructor() {
@@ -119,6 +125,13 @@ const elevatorLevel = new ElevatorLevel({
   dialogue,
   onInventoryChange: () => hotbar.render()
 });
+
+// DEV ONLY: skip the elevator puzzle so we can test the floor
+const DEV_SKIP_ELEVATOR = true;
+if (DEV_SKIP_ELEVATOR) {
+  elevatorLevel.phase = 'ready';   // unlocks the door buttons too
+  elevator.openDoors();
+}
 
 
 // Camera-mounted flashlight
@@ -257,6 +270,11 @@ const interaction = new Interaction(
       return;
     }
 
+    if (typeof data.onInteract === 'function') {
+      data.onInteract(data, object);
+      return;
+    }
+
     console.log('Interacted with:', data.id || data.kind);
 
     if (elevatorLevel.interact(data)) {
@@ -388,6 +406,7 @@ function animate() {
   // Elevator door animation
   elevator.update(delta);
   elevatorLevel.update(delta);
+  floor.update();
 
   // Check UI state
   let uiOpen = false;
