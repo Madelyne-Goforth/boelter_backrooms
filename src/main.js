@@ -4,19 +4,25 @@ import './style.css';
 
 import { Elevator } from './world/elevator.js';
 import { createElevatorReflectionEnvironment } from './world/elevator_interior.js';
+import { ElevatorLevel } from './world/elevator_level.js';
+import { ElevatorWorkings } from './world/elevator_workings.js';
+import { createElevatorGraffiti } from './world/elevator_graffiti.js';
+import { ElevatorWiring } from './world/elevator_wiring.js';
+
 import { Player } from './player/player.js';
 import { Inventory } from './systems/inventory.js';
 import { Hotbar } from './ui/hotbar.js';
 import { Interaction } from './systems/interactions.js';
 import { Dialogue } from './ui/dialogue.js';
 import { Phone } from './ui/phone.js';
+
 import './ui/phone.css';
-import { ElevatorLevel } from './world/elevator_level.js';
 
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
+
+scene.background = new THREE.Color(0x10141c);
 scene.environment = createElevatorReflectionEnvironment();
 
 
@@ -30,12 +36,21 @@ const camera = new THREE.PerspectiveCamera(
 
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
+);
+
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 
-document.querySelector('#app').appendChild(renderer.domElement);
+document.querySelector('#app').appendChild(
+  renderer.domElement
+);
 
 
 // Crosshair
@@ -47,13 +62,15 @@ document.body.appendChild(crosshair);
 // Interaction prompt
 const interactPrompt = document.createElement('div');
 interactPrompt.id = 'interact-prompt';
-interactPrompt.innerHTML = '<span>F</span> Interact';
+
 document.body.appendChild(interactPrompt);
 
 
 // Elevator
 const elevator = new Elevator();
 scene.add(elevator.group);
+
+const graffiti = createElevatorGraffiti(elevator);
 
 
 // Player
@@ -63,21 +80,19 @@ const player = new Player(
   elevator
 );
 
-
-// Camera position
 camera.position.set(
-  player.position.x,
+  player.position?.x ?? 0,
   player.groundY + player.eyeHeight,
-  player.position.z
+  player.position?.z ?? 0
 );
 
 
 // Inventory and HUD
 const inventory = new Inventory();
 const hotbar = new Hotbar(inventory);
+
 hotbar.render();
 
-// Update hotbar when items are added or removed
 inventory.onChange = () => {
   hotbar.render();
 };
@@ -88,6 +103,7 @@ const dialogue = new Dialogue({
   onOpen: () => {
     player.keys = {};
   },
+
   onClose: () => {
     player.keys = {};
   }
@@ -97,7 +113,10 @@ const dialogue = new Dialogue({
 // In-game clock
 class GameClock {
   constructor() {
-    this.time = new Date(2026, 10, 7, 21, 41, 0).getTime();
+    this.time = new Date(
+      2026, 10, 7, 21, 41, 0
+    ).getTime();
+
     this.speed = 1;
   }
 
@@ -113,11 +132,15 @@ class GameClock {
 const gameClock = new GameClock();
 
 
+// Existing elevator puzzle
 const elevatorLevel = new ElevatorLevel({
   elevator,
   inventory,
   dialogue,
-  onInventoryChange: () => hotbar.render()
+
+  onInventoryChange: () => {
+    hotbar.render();
+  }
 });
 
 
@@ -137,6 +160,7 @@ flashlight.visible = false;
 
 camera.add(flashlight);
 camera.add(flashlight.target);
+
 scene.add(camera);
 
 
@@ -165,42 +189,65 @@ const phone = new Phone(
 );
 
 
+// Lighting
+const ambientLight = new THREE.AmbientLight(
+  0xffffff,
+  0.35
+);
+
+scene.add(ambientLight);
+
+
+// Elevator workings
+const elevatorWorkings = new ElevatorWorkings({
+  scene,
+  elevator,
+  elevatorLevel,
+  player,
+  camera,
+  phone,
+  dialogue,
+  ambientLight
+});
+
+
+// Wiring puzzle
+const wiring = new ElevatorWiring(() => {
+  elevatorWorkings.completeWiring();
+});
+
+elevatorWorkings.wiringPuzzle = wiring;
+elevatorWorkings.graffiti = graffiti;
+
+
 // Check whether the player is typing
 function isTyping(event) {
   const element = event.target;
 
-  if (element instanceof HTMLElement) {
-    if (element.tagName === 'INPUT') {
-      return true;
-    }
-
-    if (element.tagName === 'TEXTAREA') {
-      return true;
-    }
-
-    if (element.isContentEditable) {
-      return true;
-    }
+  if (!(element instanceof HTMLElement)) {
+    return false;
   }
 
-  return false;
+  return (
+    element.tagName === 'INPUT' ||
+    element.tagName === 'TEXTAREA' ||
+    element.isContentEditable
+  );
 }
 
 
 // Phone keyboard controls
 function handlePhoneKeys(event) {
-  // Allow typing inside phone inputs
-  if (isTyping(event)) {
-    return;
-  }
-
-  if (event.repeat) {
+  if (isTyping(event) || event.repeat) {
     return;
   }
 
   // Phone is open
   if (phone.isOpen) {
-    if (event.code === 'KeyE' || event.code === 'Escape') {
+    if (
+      event.code === 'KeyE' ||
+      event.code === 'Escape'
+    ) {
       event.preventDefault();
       event.stopImmediatePropagation();
 
@@ -208,7 +255,21 @@ function handlePhoneKeys(event) {
       return;
     }
 
-    // Prevent other game keyboard controls
+    // Prevent game controls while phone is open
+    event.stopImmediatePropagation();
+    return;
+  }
+
+  // Wiring puzzle is open
+  if (elevatorWorkings.wiringOpen) {
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      elevatorWorkings.closeWiring();
+      return;
+    }
+
     event.stopImmediatePropagation();
     return;
   }
@@ -221,27 +282,27 @@ function handlePhoneKeys(event) {
 
     const selectedItem = inventory.getSelectedItem();
 
-    if (selectedItem === null) {
+    if (!selectedItem || selectedItem.id !== 'phone') {
       return;
     }
 
-    if (selectedItem.id === 'phone') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopImmediatePropagation();
 
-      phone.open();
-    }
+    phone.open();
   }
 }
 
+window.addEventListener(
+  'keydown',
+  handlePhoneKeys,
+  true
+);
 
-// Capture keyboard events before game listeners
-window.addEventListener('keydown', handlePhoneKeys, true);
 
-
-// Prevent game controls when typing in phone
+// Prevent game controls while phone is open
 window.addEventListener('keyup', (event) => {
-  if (phone.isOpen) {
+  if (phone.isOpen || elevatorWorkings.wiringOpen) {
     player.keys = {};
     event.stopImmediatePropagation();
   }
@@ -252,126 +313,119 @@ window.addEventListener('keyup', (event) => {
 const interaction = new Interaction(
   camera,
   scene,
+
   (data, object) => {
-    if (dialogue.active || phone.isOpen) {
+    if (
+      dialogue.active ||
+      phone.isOpen ||
+      elevatorWorkings.wiringOpen
+    ) {
       return;
     }
 
-    console.log('Interacted with:', data.id || data.kind);
+    console.log(
+      'Interacted with:',
+      data.id || data.kind
+    );
 
-    if (elevatorLevel.interact(data)) {
+    // Existing elevator items
+    if (data.kind === 'elevatorPuzzle') {
+      elevatorLevel.interact(data);
+      return;
+    }
+
+    // Firefighter access panel
+    if (data.kind === 'firePanel') {
+      if (elevatorLevel.panelUnlocked) {
+        elevatorWorkings.openWiring();
+        return;
+      }
+
+      elevatorLevel.interact({
+        kind: 'elevatorPuzzle',
+        id: 'puzzlePanel'
+      });
+
       return;
     }
 
     // Elevator buttons
     if (data.kind === 'elevatorButton') {
-      if (data.action === 'floor') {
-        if (elevatorLevel.phase !== 'ready') {
-          dialogue.show([
-            "The elevator isn't responding."
-          ], 'ELEVATOR', 'SYSTEM');
-
-          return;
+      // Hidden button inside firefighter panel
+      if (data.action === 'secretFloor') {
+        if (elevatorLevel.panelUnlocked) {
+          elevatorWorkings.openWiring();
         }
 
-        const button = elevator.controls.buttons[data.id];
-
-        if (data.floor === 2) {
-          if (button && button.userData.setLit) {
-            button.userData.setLit(true);
-          }
-
-          elevatorLevel.start();
-        } else {
-          dialogue.show([
-            "The elevator doesn't respond.",
-            "Maybe I should try Floor 2."
-          ], 'ELEVATOR', 'SYSTEM');
-        }
+        return;
       }
 
+      // Main elevator workings handles floor travel
+      // and the binary override puzzle
+      if (elevatorWorkings.handleButton(data)) {
+        return;
+      }
+
+      // Normal door controls before malfunction
       if (data.action === 'doorOpen') {
-        if (elevatorLevel.phase === 'ready') {
+        if (elevatorWorkings.phase === 'ready') {
           elevator.openDoors();
-        } else {
-          dialogue.show([
-            "The doors won't open."
-          ], 'ELEVATOR', 'SYSTEM');
         }
+
+        return;
       }
 
       if (data.action === 'doorClose') {
-        if (elevatorLevel.phase === 'ready') {
+        if (elevatorWorkings.phase === 'ready') {
           elevator.closeDoors();
-        } else {
-          dialogue.show(
-            ["The doors aren't responding"],
-            'ELEVATOR',
-            'SYSTEM'
-          );
         }
+
+        return;
       }
 
+      // Alarm
       if (data.action === 'alarm') {
         dialogue.show([
-          "You press the alarm button.",
-          "A sharp ringing echoes through the elevator.",
-          "Somewhere beyond the doors, something shifts."
+          'You press the alarm button.',
+          'A sharp ringing echoes through the elevator.',
+          'Somewhere beyond the doors, something shifts.'
         ], 'ELEVATOR', 'SYSTEM');
+
+        return;
       }
 
+      // Help
       if (data.action === 'help') {
         dialogue.show([
-          "You press the emergency help button.",
-          "A burst of static crackles through the speaker.",
-          "...",
-          "Nobody answers."
+          'You press the emergency help button.',
+          'A burst of static crackles through the speaker.',
+          '...',
+          'Nobody answers.'
         ], 'ELEVATOR', 'SYSTEM');
-      }
 
-      if (data.action === 'secretFloor') {
-        dialogue.show([
-          "There's an unmarked button behind the panel.",
-          "Where does this even go?"
-        ]);
+        return;
       }
-    }
-
-    // Firefighter panel
-    if (data.kind === 'firePanel') {
-      elevatorLevel.interact({
-        kind: 'elevatorPuzzle',
-        id: 'puzzlePanel'
-      });
-      return;
     }
   }
 );
 
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(
-  0xffffff,
-  0.35
-);
-
-scene.add(ambientLight);
-
-
+// Animation
 const clock = new THREE.Clock();
+
 let phoneTimeUpdate = 0;
 
-
-// Animation loop
 function animate() {
   requestAnimationFrame(animate);
 
-  const delta = Math.min(clock.getDelta(), 0.05);
+  const delta = Math.min(
+    clock.getDelta(),
+    0.05
+  );
 
-  // Update game time
+  // Game time
   gameClock.update(delta);
 
-  // Update phone clock every second
   phoneTimeUpdate += delta;
 
   if (phoneTimeUpdate >= 1) {
@@ -379,24 +433,30 @@ function animate() {
     phoneTimeUpdate = 0;
   }
 
-  // Pause movement while UI is open
-  if (!dialogue.active && !phone.isOpen) {
+  // UI state
+  const uiOpen =
+    dialogue.active ||
+    phone.isOpen ||
+    elevatorWorkings.wiringOpen;
+
+  // Player movement
+  if (!uiOpen) {
     player.updateMovement(delta);
     player.updatePosture(delta);
+  } else {
+    player.keys = {};
   }
 
-  // Elevator door animation
+  // Elevator animations
   elevator.update(delta);
+
+  // Existing item puzzle
   elevatorLevel.update(delta);
 
-  // Check UI state
-  let uiOpen = false;
+  // Elevator shaft, travel and malfunction
+  elevatorWorkings.update(delta);
 
-  if (dialogue.active || phone.isOpen) {
-    uiOpen = true;
-  }
-
-  // Object detection
+  // Interaction detection
   let target = null;
 
   if (!uiOpen) {
@@ -404,28 +464,23 @@ function animate() {
   }
 
   // Crosshair
-  if (uiOpen) {
-    crosshair.style.display = 'none';
-  } else {
-    crosshair.style.display = 'block';
-  }
+  crosshair.style.display = uiOpen
+    ? 'none'
+    : 'block';
 
-  if (target) {
-    crosshair.classList.add('active');
-  } else {
-    crosshair.classList.remove('active');
-  }
+  crosshair.classList.toggle(
+    'active',
+    Boolean(target)
+  );
 
   // Interaction prompt
   if (target) {
     const data = target.userData;
-    let label = 'Interact';
 
-    if (data.label) {
-      label = data.label;
-    } else if (data.id) {
-      label = data.id;
-    }
+    const label =
+      data.label ||
+      data.id ||
+      'Interact';
 
     interactPrompt.textContent = '';
 
@@ -433,6 +488,7 @@ function animate() {
     keyLabel.textContent = 'F';
 
     interactPrompt.appendChild(keyLabel);
+
     interactPrompt.appendChild(
       document.createTextNode(' ' + label)
     );
@@ -450,7 +506,9 @@ animate();
 
 // Resize
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect =
+    window.innerWidth / window.innerHeight;
+
   camera.updateProjectionMatrix();
 
   renderer.setSize(

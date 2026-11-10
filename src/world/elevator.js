@@ -236,6 +236,7 @@ export class Elevator {
   }
 
   update(delta) {
+    this.controls?.updateFirePanel?.(delta);
     if (this.doorState === 'opening') {
       this.doorProgress += delta * this.doorSpeed;
 
