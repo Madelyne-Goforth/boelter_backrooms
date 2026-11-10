@@ -16,7 +16,7 @@ export class ElevatorLevel {
     this.onEscape = onEscape;
 
     // Demo starts stuck
-    this.phase = 'stuck';
+    this.phase = 'ready';
     this.elapsed = 0;
     this.panelUnlocked = false;
     this.panelOpening = false;
@@ -48,6 +48,7 @@ export class ElevatorLevel {
       label,
       interactable: true
     };
+
     this.objects.add(mesh);
     return mesh;
   }
@@ -137,22 +138,22 @@ export class ElevatorLevel {
 
     // Tube tucked into gap bn rear wall panels
     this.rearTube = this.makeMesh(
-        'rearTube',
-        'Pick up metal tube',
-        new THREE.CylinderGeometry(0.019, 0.019, 0.68, 12),
-        metal,
-        [-0.655, 1.53, -1.865]
+      'rearTube',
+      'Pick up metal tube',
+      new THREE.CylinderGeometry(0.019, 0.019, 0.68, 12),
+      metal,
+      [-0.655, 1.53, -1.865]
     );
 
     this.rearTube.rotation.z = 0.015;
 
     // Tube leaning into back-right corner
     this.cornerTube = this.makeMesh(
-        'cornerTube',
-        'Pick up metal tube',
-        new THREE.CylinderGeometry(0.019, 0.019, 0.82, 12),
-        metal,
-        [1.73, 0.40, -1.57]
+      'cornerTube',
+      'Pick up metal tube',
+      new THREE.CylinderGeometry(0.019, 0.019, 0.82, 12),
+      metal,
+      [1.73, 0.40, -1.57]
     );
 
     // Top leans toward right wall
@@ -167,6 +168,7 @@ export class ElevatorLevel {
       tapeMaterial,
       [1.48, 0.039, 0.85]
     );
+
     this.ductTape.rotation.x = Math.PI / 2;
 
     this.addDetail(
@@ -193,6 +195,7 @@ export class ElevatorLevel {
       keyMaterial,
       [0.35, keyY, -0.55]
     );
+
     this.ceilingKey.rotation.x = Math.PI / 2;
 
     this.addDetail(
@@ -267,40 +270,8 @@ export class ElevatorLevel {
   }
 
   update(delta) {
-    if (
-      this.phase === 'closing' &&
-      this.elevator.doorState === 'closed'
-    ) {
-      this.phase = 'moving';
-      this.elapsed = 0;
-    }
-
-    if (this.phase === 'moving') {
-      this.elapsed += delta;
-
-      if (this.elapsed >= 3) {
-        this.phase = 'stuck';
-        this.say([
-          'The elevator suddenly jolts to a stop.',
-          'The lights flicker.',
-          '...',
-          'That cannot be good.',
-          'The doors are stuck.'
-        ]);
-      }
-    }
-
-    // Swing firefighter panel open when its hinge is registered
-    if (this.panelOpening && this.panelHinge) {
-      this.panelHinge.rotation.y = Math.min(
-        this.panelHinge.rotation.y + delta * 1.8,
-        Math.PI * 0.65
-      );
-
-      if (this.panelHinge.rotation.y >= Math.PI * 0.65) {
-        this.panelOpening = false;
-      }
-    }
+    // ElevatorSprint owns descent and malfunction timing.
+    // Keep this method for compatibility with the main game loop.
   }
 
   collectPart(id, mesh, item, lines) {
@@ -452,6 +423,7 @@ export class ElevatorLevel {
           consumable: true,
           icon: this.rodIcon
         });
+
         this.say(['My inventory is full.']);
         return true;
       }
@@ -474,7 +446,7 @@ export class ElevatorLevel {
         this.elevator.controls.openFirePanel();
 
         this.say([
-            'The firefighter panel is already unlocked.'
+          'The firefighter panel is already unlocked.'
         ]);
         return true;
       }

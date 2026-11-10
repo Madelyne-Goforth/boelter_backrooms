@@ -31,8 +31,17 @@ export class Player {
     this.crouchSpeed = 1.8;
     this.crawlSpeed = 0.8;
 
-    // Posture: standing, crouching, prone
-    this.posture = "standing";
+    // Posture
+    this.posture = 'standing';
+
+    // Elevator and Floor 2
+    this.canExitElevator = false;
+    this.hasExitedElevator = false;
+
+    // Camera movement effects
+    this.shakeAmount = 0;
+    this.shakeTime = 0;
+    this.shakeDuration = 0;
 
     this.colliders = [];  
 
@@ -43,14 +52,13 @@ export class Player {
   setupMouseLook() {
     this.camera.rotation.order = 'YXZ';
 
-    // Lock mouse when clicking the game
-    this.domElement.addEventListener("click", () => {
+    this.domElement.addEventListener('click', () => {
       if (!this.isLocked) {
         this.domElement.requestPointerLock();
       }
     });
 
-    document.addEventListener("pointerlockchange", () => {
+    document.addEventListener('pointerlockchange', () => {
       this.isLocked =
         document.pointerLockElement === this.domElement;
 
@@ -59,7 +67,7 @@ export class Player {
       }
     });
 
-    document.addEventListener("mousemove", (event) => {
+    document.addEventListener('mousemove', (event) => {
       if (!this.isLocked) return;
 
       const sensitivity = 0.002;
@@ -76,65 +84,72 @@ export class Player {
       this.camera.rotation.set(this.pitch, this.yaw, 0);
     });
 
-    // Face elevator doors on startup
+    // Face elevator doors
     this.camera.rotation.set(this.pitch, this.yaw, 0);
   }
 
   setupKeyboard() {
-    document.addEventListener("keydown", (event) => {
+    document.addEventListener('keydown', (event) => {
       this.keys[event.code] = true;
 
       if (!this.isLocked) return;
 
-      // Prevent browser behavior for gameplay keys
       if (
-        event.code === "Space" ||
-        event.code === "ControlLeft" ||
-        event.code === "ControlRight"
+        event.code === 'Space' ||
+        event.code === 'ControlLeft' ||
+        event.code === 'ControlRight'
       ) {
         event.preventDefault();
       }
 
-      // Only toggle once per keypress
       if (event.repeat) return;
 
-      // C: toggle crouch
-      if (
-        event.code === "KeyC"
-      ) {
+      // C: crouch
+      if (event.code === 'KeyC') {
         this.posture =
-          this.posture === "crouching"
-            ? "standing"
-            : "crouching";
+          this.posture === 'crouching'
+            ? 'standing'
+            : 'crouching';
       }
 
-      // Z: toggle prone
-      if (event.code === "KeyZ") {
+      // Z: prone
+      if (event.code === 'KeyZ') {
         this.posture =
-          this.posture === "prone"
-            ? "standing"
-            : "prone";
+          this.posture === 'prone'
+            ? 'standing'
+            : 'prone';
       }
 
-      // Space: return to standing
-      if (event.code === "Space") {
-        this.posture = "standing";
+      // Space: stand
+      if (event.code === 'Space') {
+        this.posture = 'standing';
       }
     });
 
-    document.addEventListener("keyup", (event) => {
+    document.addEventListener('keyup', (event) => {
       this.keys[event.code] = false;
     });
 
-    window.addEventListener("blur", () => {
+    window.addEventListener('blur', () => {
       this.keys = {};
     });
+  }
+
+  // Allow exit only after the elevator arrives
+  setElevatorExit(enabled) {
+    this.canExitElevator = enabled;
+  }
+
+  // Camera shake for elevator motion
+  shake(amount = 0.025, duration = 0.4) {
+    this.shakeAmount = amount;
+    this.shakeDuration = duration;
+    this.shakeTime = duration;
   }
 
   updateMovement(delta) {
     if (!this.isLocked) return;
 
-    // Movement relative to camera yaw
     const forward = new THREE.Vector3(
       -Math.sin(this.yaw),
       0,
@@ -154,7 +169,6 @@ export class Player {
     if (this.keys.KeyD) direction.add(right);
     if (this.keys.KeyA) direction.sub(right);
 
-    // Normalize diagonal movement
     if (direction.lengthSq() > 0) {
       direction.normalize();
     }
@@ -162,12 +176,11 @@ export class Player {
     const sprinting =
       this.keys.ShiftLeft || this.keys.ShiftRight;
 
-    // Choose speed based on posture
     let speed = this.walkSpeed;
 
-    if (this.posture === "prone") {
+    if (this.posture === 'prone') {
       speed = this.crawlSpeed;
-    } else if (this.posture === "crouching") {
+    } else if (this.posture === 'crouching') {
       speed = this.crouchSpeed;
     } else if (sprinting) {
       speed = this.sprintSpeed;
@@ -175,10 +188,8 @@ export class Player {
 
     this.position.addScaledVector(direction, speed * delta);
 
-    // Keep player inside elevator
     this.checkCollision();
 
-    // Update horizontal camera position
     this.camera.position.x = this.position.x;
     this.camera.position.z = this.position.z;
   }
@@ -200,32 +211,103 @@ export class Player {
     const maxZ =
       halfDepth - wallThickness - this.radius;
 
-    this.position.x = THREE.MathUtils.clamp(
-      this.position.x,
-      -maxX,
-      maxX
-    );
+    const elevatorFront = maxZ;
+    const elevatorBack = -maxZ;
 
-    this.position.z = THREE.MathUtils.clamp(
-      this.position.z,
-      -maxZ,
-      maxZ
-    );
+    // Normal elevator collision
+    if (!this.canExitElevator) {
+      this.position.x = THREE.MathUtils.clamp(
+        this.position.x,
+        -maxX,
+        maxX
+      );
+
+      this.position.z = THREE.MathUtils.clamp(
+        this.position.z,
+        elevatorBack,
+        elevatorFront
+      );
+
+      return;
+    }
+
+    // Floor 2 exit is on the positive Z side
+    const doorHalfWidth =
+      this.elevator.doorWidth / 2 - this.radius;
+
+    // The player can only pass through the doorway
+    const insideDoorway =
+      Math.abs(this.position.x) <= doorHalfWidth;
+
+    // Prevent walking through the front wall
+    if (
+      !insideDoorway &&
+      !this.hasExitedElevator &&
+      this.position.z > elevatorFront
+    ) {
+      this.position.z = elevatorFront;
+    }
+
+    // Keep the player inside the elevator's side walls
+    // until they cross the doorway
+    if (this.position.z <= elevatorFront) {
+      this.position.x = THREE.MathUtils.clamp(
+        this.position.x,
+        -maxX,
+        maxX
+      );
+    }
+
+    // Mark the player as having left the elevator
+    if (this.position.z > elevatorFront) {
+      this.hasExitedElevator = true;
+    }
+
+    // Floor 2 placeholder platform boundaries
+    // Platform spans X -3.5 to 3.5 and Z 2.1 to 8.1
+    if (this.hasExitedElevator) {
+      const roomMaxX = 3.5 - this.radius;
+      const roomMaxZ = 8.1 - this.radius;
+
+      this.position.x = THREE.MathUtils.clamp(
+        this.position.x,
+        -roomMaxX,
+        roomMaxX
+      );
+
+      this.position.z = Math.min(
+        this.position.z,
+        roomMaxZ
+      );
+
+      // Prevent walking through the elevator's
+      // side walls when returning from the room
+      if (
+        this.position.z < elevatorFront &&
+        Math.abs(this.position.x) > doorHalfWidth
+      ) {
+        this.position.z = elevatorFront;
+      }
+
+      this.position.z = Math.max(
+        this.position.z,
+        elevatorBack
+      );
+    }
   }
 
   updatePosture(delta) {
-    // Determine target height
-    if (this.posture === "crouching") {
+    if (this.posture === 'crouching') {
       this.targetEyeHeight = crouchHeight;
-    } else if (this.posture === "prone") {
+    } else if (this.posture === 'prone') {
       this.targetEyeHeight = lowCrawlHeight;
     } else {
       this.targetEyeHeight = standingHeight;
     }
 
-    // Smooth height transition
     const transitionSpeed = 5;
     const step = transitionSpeed * delta;
+
     const difference =
       this.targetEyeHeight - this.eyeHeight;
 
@@ -235,9 +317,32 @@ export class Player {
       this.eyeHeight += Math.sign(difference) * step;
     }
 
-    // Update vertical camera position
+    // Ground height is the source of truth
     this.camera.position.y =
       this.groundY + this.eyeHeight;
+
+    // Temporary camera shake
+    if (this.shakeTime > 0) {
+      this.shakeTime = Math.max(
+        0,
+        this.shakeTime - delta
+      );
+
+      const fade = this.shakeDuration > 0
+        ? this.shakeTime / this.shakeDuration
+        : 0;
+
+      const amount = this.shakeAmount * fade;
+
+      this.camera.position.x +=
+        (Math.random() - 0.5) * amount;
+
+      this.camera.position.y +=
+        (Math.random() - 0.5) * amount;
+
+      this.camera.position.z +=
+        (Math.random() - 0.5) * amount;
+    }
   }
 
   setColliders(list) {

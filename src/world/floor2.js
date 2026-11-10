@@ -77,6 +77,10 @@ export class Floor2 {
     const outside = this.player.position.z > HALL_START_Z ? 1 : 0;
     m.t += (outside - m.t) * Math.min(1, delta * 3);
 
+    // don't touch the lights while the player is in the elevator, so its effects keep working
+    if (m.t < 0.001 && !m.active) return;
+    m.active = m.t >= 0.001;
+
     if (m.ambient) m.ambient.intensity = THREE.MathUtils.lerp(m.baseAmbient, HALL_AMBIENT, m.t);
     m.scene.environmentIntensity = THREE.MathUtils.lerp(m.baseEnv, HALL_ENVIRONMENT, m.t);
   }
