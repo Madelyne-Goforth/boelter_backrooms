@@ -62,50 +62,73 @@ export class BoelterFloor {
     this.doorBlock = this.addRect(-gap, gap, hd - t - 0.1, hd, inv);
   }
 
+  // Hall runs left/right (along x) in front of the elevator.
+  // Player faces +z when they exit, so their RIGHT is -x and their LEFT is +x.
+  // Long stretch of doors to the right, short stub to the left.
   buildCorridor() {
     const e = this.elevator;
-    const z0 = e.depth / 2 + 0.16;     // where the elevator's outer wall ends
-    const W = e.width;                 // same width as the elevator so it lines up
-    const hw = W / 2;
-    const L = 40;
+    const hw = e.width / 2;
+    const z0 = e.depth / 2 + 0.16;     // elevator's outer face; hall's near wall is flush with it
+    const HALL_W = 3.4;                // distance across the hall (z)
+    const zFar = z0 + HALL_W;          // inner face of the far wall
+    const xRight = -34;                // end of the long side
+    const xLeft = 8;                   // end of the short stub
     const H = this.wallH;
+    const T = WALL_T;
 
-    // floor + ceiling
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(W + 24, 0.1, L), this.floorMat);
-    floor.position.set(11, -0.05, z0 + L / 2);
+    // floor + ceiling (floor starts at the elevator sill so there's no gap)
+    const zStart = e.depth / 2;
+    const span = xLeft - xRight;
+    const cx = (xLeft + xRight) / 2;
+    const cz = (zStart + zFar) / 2;
+    const depthZ = zFar - zStart;
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(span, 0.1, depthZ), this.floorMat);
+    floor.position.set(cx, -0.05, cz);
     this.group.add(floor);
 
     const ceil = new THREE.Mesh(
-      new THREE.BoxGeometry(W + 24, 0.1, L),
+      new THREE.BoxGeometry(span, 0.1, depthZ),
       new THREE.MeshStandardMaterial({ color: 0xf4f4f2 })
     );
-    ceil.position.set(11, H + 0.05, z0 + L / 2);
+    ceil.position.set(cx, H + 0.05, cz);
     this.group.add(ceil);
 
-    // main corridor walls
-    this.wallZ(z0, z0 + L, -hw);                // left
-    this.wallX(-hw, hw, z0 + L);                // end
+    // near wall (the elevator side), split around the elevator
+    this.addRect(xRight, -hw, z0 - T, z0);
+    this.addRect(hw, xLeft, z0 - T, z0);
 
-    // right wall, with a gap for a side hallway at z0+22 .. z0+28
-    this.wallZ(z0, z0 + 22, hw);
-    this.wallZ(z0 + 28, z0 + L, hw);
+    // far wall (faces the player when they exit)
+    this.addRect(xRight - T, xLeft + T, zFar, zFar + T);
 
-    // side hallway going +x
-    this.wallX(hw, 22, z0 + 22);
-    this.wallX(hw, 22, z0 + 28);
-    this.wallZ(z0 + 22, z0 + 28, 22);
+    // end caps
+    this.addRect(xRight - T, xRight, z0 - T, zFar + T);
+    this.addRect(xLeft, xLeft + T, z0 - T, zFar + T);
 
-    // doors on the left wall
-    // slab sits just proud of the wall's inner face (wall is WALL_T thick, centered on -hw)
+    // dark baseboards (visual only)
+    const base = new THREE.MeshStandardMaterial({ color: 0x3b2a22, roughness: 0.8 });
+    const addBase = (w, d, x, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.15, d), base);
+      m.position.set(x, 0.075, z);
+      this.group.add(m);
+    };
+    addBase(span, 0.04, cx, zFar - 0.02);                                    // far wall
+    addBase(-hw - xRight, 0.04, (xRight - hw) / 2, z0 + 0.02);                // near wall, right side
+    addBase(xLeft - hw, 0.04, (xLeft + hw) / 2, z0 + 0.02);                  // near wall, left side
+
+    // doors: mostly on the right (-x). Far wall faces the player; near wall is behind them.
+    const farDoorsX  = [-5, -11, -17, -23, -29, 5];
+    const nearDoorsX = [-8, -14, -20, -26, -32];
     let n = 0;
-    for (let z = z0 + 4; z < z0 + L - 2; z += 6) {
-      this.addDoorSlab(-hw + WALL_T / 2 + 0.03, z, `Room ${3410 + n * 10}`);
-      n++;
-    }
+    for (const x of farDoorsX)  this.addDoorSlab('far',  x, zFar - 0.03, `Room ${3410 + 10 * n++}`);
+    for (const x of nearDoorsX) this.addDoorSlab('near', x, z0 + 0.03,   `Room ${3410 + 10 * n++}`);
+
+    this.hall = { z0, zFar, xRight, xLeft };
   }
 
-  addDoorSlab(x, z, name) {
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.1, 1.0), this.doorMat);
+  // kind: 'far' or 'near'. Both are walls running along x, so the slab is wide in x, thin in z.
+  addDoorSlab(kind, x, z, name) {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.1, 0.06), this.doorMat);
     slab.position.set(x, 1.05, z);
     this.group.add(slab);
 
@@ -119,10 +142,11 @@ export class BoelterFloor {
 
   buildLights() {
     this.group.add(new THREE.HemisphereLight(0xffffff, 0x888070, 0.5));
-    const z0 = this.elevator.depth / 2 + 0.16;
-    for (let z = z0 + 6; z < z0 + 40; z += 12) {
+    const { z0, zFar, xRight, xLeft } = this.hall;
+    const zMid = (z0 + zFar) / 2;
+    for (let x = xLeft - 3; x > xRight; x -= 10) {
       const l = new THREE.PointLight(0xfff4e0, 14, 14, 1.6);
-      l.position.set(0, this.wallH - 0.8, z);
+      l.position.set(x, this.wallH - 0.8, zMid);
       this.group.add(l);
     }
   }
