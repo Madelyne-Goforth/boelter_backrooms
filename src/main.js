@@ -12,6 +12,7 @@ import { Phone } from './ui/phone.js';
 import './ui/phone.css';
 import { ElevatorLevel } from './world/elevator_level.js';
 import { Floor2 } from './world/floor2.js';
+import { LockerLevel } from './world/locker_level.js';
 
 
 // Scene
@@ -94,9 +95,27 @@ const dialogue = new Dialogue({
 
 
 // Floor Two (needs elevator, player and dialogue to exist first)
-const floor = new Floor2({ elevator, dialogue, player });
+// Floor Two
+const floor = new BoelterFloor({ elevator, dialogue });
 scene.add(floor.group);
-player.setColliders(floor.colliders);
+
+// Locker puzzle
+const lockerLevel = new LockerLevel({
+  scene,
+  dialogue,
+  onInputChange: () => {
+    player.keys = {};
+  }
+});
+
+//show the lockers immediately.
+lockerLevel.start();
+
+// Combine hallway and locker collision boundaries.
+player.setColliders([
+  ...floor.colliders,
+  ...lockerLevel.colliders
+]);
 
 
 // In-game clock
@@ -122,7 +141,8 @@ const elevatorLevel = new ElevatorLevel({
   elevator,
   inventory,
   dialogue,
-  onInventoryChange: () => hotbar.render()
+  onInventoryChange: () => hotbar.render(),
+  onEscape: () => lockerLevel.start()
 });
 
 // DEV ONLY: skip the elevator puzzle so we can test the floor
@@ -276,6 +296,12 @@ const interaction = new Interaction(
 
     console.log('Interacted with:', data.id || data.kind);
 
+    // Handle locker interactions.
+    if (lockerLevel.interact(data)) {
+      return;
+    }
+
+    // Handle elevator interactions.
     if (elevatorLevel.interact(data)) {
       return;
     }
@@ -405,7 +431,9 @@ function animate() {
   // Elevator door animation
   elevator.update(delta);
   elevatorLevel.update(delta);
-  floor.update(delta);
+  floor.update();
+  // Update locker level
+  lockerLevel.update(delta);
 
   // Check UI state
   let uiOpen = false;
