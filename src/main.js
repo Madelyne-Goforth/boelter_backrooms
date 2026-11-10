@@ -94,9 +94,8 @@ const dialogue = new Dialogue({
 });
 
 
-// Floor Two (needs elevator, player and dialogue to exist first)
-// Floor Two
-const floor = new BoelterFloor({ elevator, dialogue });
+// Floor Two 
+const floor = new Floor2({ elevator, dialogue, player });
 scene.add(floor.group);
 
 // Locker puzzle
@@ -431,7 +430,7 @@ function animate() {
   // Elevator door animation
   elevator.update(delta);
   elevatorLevel.update(delta);
-  floor.update();
+  floor.update(delta);
   // Update locker level
   lockerLevel.update(delta);
 
