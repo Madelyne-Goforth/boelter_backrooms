@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 import './style.css';
 
@@ -12,7 +11,7 @@ import { Dialogue } from './ui/dialogue.js';
 import { Phone } from './ui/phone.js';
 import './ui/phone.css';
 import { ElevatorLevel } from './world/elevator_level.js';
-import { BoelterFloor } from './world/boelter_floor.js';
+import { Floor2 } from './world/floor2.js';
 
 
 // Scene
@@ -95,7 +94,7 @@ const dialogue = new Dialogue({
 
 
 // Floor Two (needs elevator, player and dialogue to exist first)
-const floor = new BoelterFloor({ elevator, dialogue });
+const floor = new Floor2({ elevator, dialogue, player });
 scene.add(floor.group);
 player.setColliders(floor.colliders);
 
@@ -406,7 +405,7 @@ function animate() {
   // Elevator door animation
   elevator.update(delta);
   elevatorLevel.update(delta);
-  floor.update();
+  floor.update(delta);
 
   // Check UI state
   let uiOpen = false;

@@ -4,9 +4,11 @@ import { makeInteractable } from './interactable.js';
 const WALL_T = 0.2;
 
 export class BoelterFloor {
-  constructor({ elevator, dialogue }) {
+  // doorways: openings cut into the far wall, e.g. [{ x: -17, width: 1.0 }]
+  constructor({ elevator, dialogue, doorways = [] }) {
     this.elevator = elevator;
     this.dialogue = dialogue;
+    this.doorways = doorways;
     this.group = new THREE.Group();
     this.colliders = [];
 
@@ -98,8 +100,24 @@ export class BoelterFloor {
     this.addRect(xRight, -hw, z0 - T, z0);
     this.addRect(hw, xLeft, z0 - T, z0);
 
-    // far wall (faces the player when they exit)
-    this.addRect(xRight - T, xLeft + T, zFar, zFar + T);
+    // far wall (faces the player when they exit), cut around any doorways
+    const DOOR_H = 2.1;
+    const cuts = [...this.doorways].sort((a, b) => a.x - b.x);
+    let cursor = xRight - T;
+    for (const d of cuts) {
+      const x1 = d.x - d.width / 2;
+      const x2 = d.x + d.width / 2;
+      this.addRect(cursor, x1, zFar, zFar + T);
+      // wall above the opening (visual only; nobody can jump through it)
+      const lintel = new THREE.Mesh(
+        new THREE.BoxGeometry(d.width, H - DOOR_H, T),
+        this.wallMat
+      );
+      lintel.position.set(d.x, DOOR_H + (H - DOOR_H) / 2, zFar + T / 2);
+      this.group.add(lintel);
+      cursor = x2;
+    }
+    this.addRect(cursor, xLeft + T, zFar, zFar + T);
 
     // end caps
     this.addRect(xRight - T, xRight, z0 - T, zFar + T);
@@ -120,10 +138,14 @@ export class BoelterFloor {
     const farDoorsX  = [-5, -11, -17, -23, -29, 5];
     const nearDoorsX = [-8, -14, -20, -26, -32];
     let n = 0;
-    for (const x of farDoorsX)  this.addDoorSlab('far',  x, zFar - 0.03, `Room ${3410 + 10 * n++}`);
+    for (const x of farDoorsX) {
+      const name = `Room ${3410 + 10 * n++}`;
+      if (this.doorways.some(d => Math.abs(d.x - x) < 0.01)) continue;   // real doorway lives here
+      this.addDoorSlab('far', x, zFar - 0.03, name);
+    }
     for (const x of nearDoorsX) this.addDoorSlab('near', x, z0 + 0.03,   `Room ${3410 + 10 * n++}`);
 
-    this.hall = { z0, zFar, xRight, xLeft };
+    this.hall = { z0, zFar, xRight, xLeft, wallT: T };
   }
 
   // kind: 'far' or 'near'. Both are walls running along x, so the slab is wide in x, thin in z.
@@ -140,15 +162,10 @@ export class BoelterFloor {
     });
   }
 
+  // Hall light fixtures (and their flicker) are built by HallCeiling in hall_ceiling.js.
+  // This is just a faint fill so the hall is never pitch black between flickers.
   buildLights() {
-    this.group.add(new THREE.HemisphereLight(0xffffff, 0x888070, 0.5));
-    const { z0, zFar, xRight, xLeft } = this.hall;
-    const zMid = (z0 + zFar) / 2;
-    for (let x = xLeft - 3; x > xRight; x -= 10) {
-      const l = new THREE.PointLight(0xfff4e0, 14, 14, 1.6);
-      l.position.set(x, this.wallH - 0.8, zMid);
-      this.group.add(l);
-    }
+    this.group.add(new THREE.HemisphereLight(0xffffff, 0x888070, 0.12));
   }
 
   update() {
