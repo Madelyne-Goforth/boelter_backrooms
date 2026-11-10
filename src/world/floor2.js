@@ -11,7 +11,7 @@ import { ScienceLab } from './science_lab.js';
 //   science_lab.js    - ajar door + lab room (where the escape puzzles go)
 //
 // main.js only talks to this class:
-//   const floor = new Floor2({ elevator, dialogue, player });
+//   const floor = new Floor2({ elevator, dialogue, player, inventory });
 //   scene.add(floor.group);
 //   player.setColliders(floor.colliders);
 //   ...in animate():  floor.update(delta);
@@ -26,7 +26,8 @@ const HALL_ENVIRONMENT = 0.25;    // scene.environmentIntensity in the hall
 const HALL_START_Z = 2.3;         // player z past the elevator's front wall
 
 export class Floor2 {
-  constructor({ elevator, dialogue, player }) {
+  // inventory: the lab puzzle puts the key here. onLabEscape: runs when the player unlocks the lab door.
+  constructor({ elevator, dialogue, player, inventory = null, onLabEscape = null }) {
     this.group = new THREE.Group();
 
     // base hall, with an opening cut into the far wall for the lab door
@@ -52,12 +53,14 @@ export class Floor2 {
       height: elevator.height,
       dialogue,
       player,
-      colliders: this.colliders
+      colliders: this.colliders,
+      inventory,
+      onEscape: onLabEscape
     });
     this.group.add(this.lab.group);
 
     this.player = player;
-    this.mood = { ready: false, t: 0, scene: null, ambient: null, baseAmbient: 0, baseEnv: 1 };
+    this.mood = { ready: false, active: false, t: 0, scene: null, ambient: null, baseAmbient: 0, baseEnv: 1 };
   }
 
   // fade the scene's global lighting between the elevator's look and the hall's darker look

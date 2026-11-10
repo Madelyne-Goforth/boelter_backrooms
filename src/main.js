@@ -112,7 +112,7 @@ const dialogue = new Dialogue({
 
 
 // Floor Two 
-const floor = new Floor2({ elevator, dialogue, player });
+const floor = new Floor2({ elevator, dialogue, player, inventory });
 scene.add(floor.group);
 
 // Locker puzzle

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeInteractable } from './interactable.js';
+import { LabPuzzle, MIX_HEX, SOLUTION, KEY_ID } from './lab_puzzle.js';
 
 // The science lab: a room behind a doorway cut into the hall's far wall.
 //
@@ -20,13 +21,17 @@ const AJAR_ANGLE = 0.38;   // ~22 degrees
 const OPEN_ANGLE = 1.85;   // ~106 degrees
 
 export class ScienceLab {
-  constructor({ hall, doorX, height, dialogue, player, colliders }) {
+  // inventory: where the key goes. onEscape: called when the player unlocks the door with the key.
+  constructor({ hall, doorX, height, dialogue, player, colliders, inventory = null, onEscape = null }) {
     this.hall = hall;
     this.doorX = doorX;
     this.H = height;
     this.dialogue = dialogue;
     this.player = player;
     this.colliders = colliders;       // shared with the player's collision list
+    this.inventory = inventory;
+    this.onEscape = onEscape;
+    this.unlocked = false;            // true once the key has been used on the door
 
     this.group = new THREE.Group();
     this.lights = [];
@@ -58,6 +63,7 @@ export class ScienceLab {
     this.buildShell();
     this.buildDoor();
     this.buildProps();
+    this.puzzle = new LabPuzzle(this);   // dye station, hood lock, key (see lab_puzzle.js)
     this.buildLights();
   }
 
@@ -193,11 +199,29 @@ export class ScienceLab {
     }
 
     if (this.state === 'locked') {
+      if (this.inventory?.hasItem(KEY_ID)) {
+        this.unlockWithKey();
+        return;
+      }
+
       this.dialogue.show([
         "The door won't budge.",
         "It locked behind me."
       ], 'DOOR', 'SYSTEM');
     }
+  }
+
+  unlockWithKey() {
+    this.inventory.removeItemById(KEY_ID);
+    this.unlocked = true;               // keeps the door from auto-closing again
+    this.state = 'opening';
+    this.setDoorInteractable(false);
+
+    this.dialogue.show([
+      "The key turns. The lock clicks open."
+    ], 'DOOR', 'SYSTEM');
+
+    this.onEscape?.();
   }
 
   get sealed() {
@@ -254,7 +278,9 @@ export class ScienceLab {
     this.block(doorX - hoodW / 2, doorX + hoodW / 2, 2.05, 2.45, z1 - hoodD, z1, this.steelMat); // top hood
     this.block(doorX - hoodW / 2, doorX - hoodW / 2 + 0.06, 0.9, 2.05, z1 - hoodD, z1, this.steelMat); // sides
     this.block(doorX + hoodW / 2 - 0.06, doorX + hoodW / 2, 0.9, 2.05, z1 - hoodD, z1, this.steelMat);
-    this.block(doorX - hoodW / 2, doorX + hoodW / 2, 0.9, 1.7, z1 - hoodD + 0.02, z1 - hoodD + 0.04, this.glassMat); // sash
+    this.hoodSash = this.block(doorX - hoodW / 2, doorX + hoodW / 2, 0.9, 1.7, z1 - hoodD + 0.02, z1 - hoodD + 0.04, this.glassMat); // sash
+    this.hoodSashY = this.hoodSash.position.y;   // the puzzle lifts it when solved
+    this.hood = { w: hoodW, d: hoodD, frontZ: z1 - hoodD };
 
     // ---- tall units either side of the entry wall
     this.buildTallCabinet(x1 - 0.3, zIn + 1.5, 0x8a1f1f, 'Chemical cabinet');  // +x side, red
@@ -389,16 +415,44 @@ export class ScienceLab {
   buildWhiteboard(x, z) {
     const tex = this.makeCanvasTexture(1024, 512, (g, w, h) => {
       g.fillStyle = '#f4f5f2'; g.fillRect(0, 0, w, h);
+
       // ghosting from old erased writing
       g.fillStyle = 'rgba(0,0,0,0.05)';
-      for (let i = 0; i < 18; i++) g.fillRect(40 + Math.random() * 600, 40 + Math.random() * 400, 120 + Math.random() * 200, 8);
-      g.fillStyle = '#1d3b8b';
-      g.font = '38px "Comic Sans MS", cursive, sans-serif';
-      g.fillText('PV = nRT', 640, 90);
-      g.fillText('ΔG = ΔH − TΔS', 600, 160);
+      for (let i = 0; i < 14; i++) g.fillRect(40 + Math.random() * 900, 30 + Math.random() * 440, 120 + Math.random() * 200, 8);
+
+      // leftovers of an old lecture
+      g.fillStyle = 'rgba(29,59,139,0.35)';
+      g.font = '34px "Comic Sans MS", cursive, sans-serif';
+      g.fillText('PV = nRT', 760, 70);
+      g.fillText('\u0394G = \u0394H \u2212 T\u0394S', 700, 120);
+
+      // THE CLUE: three samples, in order (driven by SOLUTION in lab_puzzle.js)
+      g.fillStyle = '#1d1d1d';
+      g.font = 'bold 44px "Comic Sans MS", cursive, sans-serif';
+      g.fillText('HOOD SAMPLES - IN ORDER', 70, 90);
+
+      SOLUTION.forEach((name, i) => {
+        const cx = 170 + i * 250, cy = 230;
+        g.fillStyle = '#' + MIX_HEX[name].toString(16).padStart(6, '0');
+        g.beginPath(); g.arc(cx, cy, 70, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#222'; g.lineWidth = 5; g.stroke();
+
+        g.fillStyle = '#222';
+        g.font = 'bold 40px "Comic Sans MS", cursive, sans-serif';
+        g.textAlign = 'center';
+        g.fillText(String(i + 1), cx, cy + 118);
+
+        if (i < SOLUTION.length - 1) {
+          g.font = 'bold 60px sans-serif';
+          g.fillText('\u2192', cx + 125, cy + 20);
+        }
+        g.textAlign = 'left';
+      });
+
       g.fillStyle = '#9b1c1c';
-      g.fillText('do NOT leave the', 90, 360);
-      g.fillText('hood running overnight!', 90, 410);
+      g.font = '36px "Comic Sans MS", cursive, sans-serif';
+      g.fillText("primaries only - we're out of", 70, 430);
+      g.fillText('everything else!', 70, 475);
     });
 
     const frame = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.26, 2.46), this.steelMat);
@@ -418,8 +472,10 @@ export class ScienceLab {
       id: 'whiteboard',
       label: 'Read whiteboard',
       onInteract: () => this.dialogue.show([
-        "Mostly wiped clean. Faint ghosts of old equations remain.",
-        "Someone scrawled a reminder about the fume hood."
+        "Three colored circles, numbered 1 to 3, with arrows between them.",
+        "Above them: \"HOOD SAMPLES - IN ORDER\".",
+        "Below, in red marker: \"primaries only - we're out of everything else!\"",
+        "The fume hood has a lock with three lights. Samples... of these colors?"
       ], 'YOU', 'INSPECT')
     });
   }
@@ -493,7 +549,7 @@ export class ScienceLab {
     // player has stepped well inside: shut the door behind them
     if (this.state === 'open') {
       const insideX = Math.abs(p.x - this.doorX) < LAB_W / 2;
-      if (insideX && p.z > this.zIn + 1.0) {
+      if (!this.unlocked && insideX && p.z > this.zIn + 1.0) {
         this.state = 'closing';
         this.closeSpeed = 0;
         this.doorBlock.solid = true;        // can't back out through the doorway
@@ -519,8 +575,20 @@ export class ScienceLab {
 
     this.pivot.rotation.y = this.angle;
 
-    // ---- lights: dim spill while the player is outside, full brightness once sealed in
-    const target = this.sealed ? 1 : 0.2;
+    // door prompt: tells the player when they're holding the key
+    if (this.state === 'locked') {
+      const label = this.inventory?.hasItem(KEY_ID) ? 'Unlock door' : 'Locked door';
+      if (label !== this.doorLabel) {
+        this.doorLabel = label;
+        this.setDoorLabel(label);
+      }
+    }
+
+    this.puzzle.update(delta);
+
+    // ---- lights: dim spill while the player is outside, full brightness once they're in the lab
+    const playerInLab = p.z > this.zFar;
+    const target = (this.sealed || playerInLab) ? 1 : 0.2;
     this.level += (target - this.level) * Math.min(1, delta * 5);
 
     let mul = 1;
