@@ -658,8 +658,6 @@ const diffuser = new THREE.MeshStandardMaterial({
     }
   }
 
-  // Lighting
-
 // Lighting
     for (const x of [-panelX, panelX]) {
     for (const z of [-panelZ, panelZ]) {
