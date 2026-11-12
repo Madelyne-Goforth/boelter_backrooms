@@ -1,9 +1,8 @@
-
 import * as THREE from 'three';
 
 export class ElevatorWorkings {
-  constructor({ scene, elevator, elevatorLevel, player, camera, phone, dialogue, ambientLight }) {
-    Object.assign(this, { scene, elevator, elevatorLevel, player, camera, phone, dialogue, ambientLight });
+  constructor({ scene, elevator, elevatorLevel, player, camera, phone, dialogue, ambientLight, onEscaped = null }) {
+    Object.assign(this, { scene, elevator, elevatorLevel, player, camera, phone, dialogue, ambientLight, onEscaped });
 
     this.phase = 'ready';
     this.floor = 4;
@@ -43,15 +42,14 @@ export class ElevatorWorkings {
     };
 
     box(7, 22, 0.3, 0, -3, -3.8);
-    box(0.3, 22, 8, -3.4, -3, 0);
-    box(0.3, 22, 8, 3.4, -3, 0);
+    box(0.3, 22, 6, -3.4, -3, -1);
+    box(0.3, 22, 6, 3.4, -3, -1);
     for (const x of [-2.8, 2.8]) box(0.12, 22, 0.12, x, -3, 2.9, steel);
 
     this.scene.add(shaft);
     this.shaft = shaft;
   }
 
-  // Temporary shaft wall and Floor 2 landing
   makeEscapeLanding() {
     const landing = new THREE.Group();
     landing.name = 'floor2EscapeLanding';
@@ -71,8 +69,6 @@ export class ElevatorWorkings {
       landing.add(mesh);
       return mesh;
     };
-
-    // Upper shaft wall blocks the doorway, leaving a crawl-height gap
     const doorWidth = this.elevator.doorWidth ?? 2.1;
     const doorHeight = this.elevator.doorHeight ?? 2.7;
     const gapHeight = 0.82;
@@ -80,12 +76,12 @@ export class ElevatorWorkings {
     box(doorWidth + 0.25, doorHeight - gapHeight, 0.24,
       0, gapHeight + (doorHeight - gapHeight) / 2, frontZ);
 
-    // Floor 2 is lower than the elevator's crawl opening
-    // Leave a drop beyond the threshold for the floor transition
-    const floorDrop = 0.65;
-    const floorThickness = 0.22;
-    box(doorWidth + 2.2, floorThickness, 5.5,
-      0, -floorDrop - floorThickness / 2, frontZ + 2.8, floorMaterial);
+    if (!this.onEscaped) {
+      const floorDrop = 0.65;
+      const floorThickness = 0.22;
+      box(doorWidth + 2.2, floorThickness, 5.5,
+        0, -floorDrop - floorThickness / 2, frontZ + 2.8, floorMaterial);
+    }
 
     this.scene.add(landing);
     this.escapeLanding = landing;
@@ -275,6 +271,18 @@ export class ElevatorWorkings {
     this.say(['The elevator jolts violently.', 'The lights flicker out.', 'Something is wrong.']);
   }
 
+  // dev to skip level
+  skipToEscape() {
+    if (this.phase === 'escaped') return;
+    this.elevator.group.position.y = this.floorY[3];
+    this.moveCab(0);
+    this.floor = 3;
+    this.elevator.controls?.setFloor?.(3, 'idle');
+    this.phase = 'doorReady';
+    this.elevatorLevel.phase = 'doorReady';
+    this.handleButton({ action: 'doorOpen' });
+  }
+
   handleButton(data) {
     if (this.phase === 'doorReady') {
       if (data.action === 'doorOpen') {
@@ -283,8 +291,13 @@ export class ElevatorWorkings {
         this.showEscapeLanding();
         this.elevator.openDoors();
         this.player.setElevatorExit?.(true);
-        this.showHint('EMERGENCY DOOR RELEASE: crouch/crawl through the gap. Floor 2 is below; watch the drop.');
-        this.say(['The emergency locks release.', 'The elevator does not move.']);
+        this.onEscaped?.();                      
+        this.showHint('EMERGENCY DOOR RELEASE: press Z to crawl through the gap. Floor 2 is below; watch the drop.');
+        this.say([
+          'The emergency locks release.',
+          'The elevator does not move.',
+          'The doors have opened onto a wall, with a gap at the bottom. I could crawl through.'
+        ]);
       }
       return true;
     }
@@ -355,6 +368,11 @@ export class ElevatorWorkings {
   }
 
   update(delta) {
+    if (this.phase === 'escaped' && !this.exited && this.player.position.z > 2.6) {
+      this.exited = true;
+      if (this.hint) this.hint.hidden = true;
+    }
+
     if (this.phase === 'closing' && this.elevator.doorState === 'closed') {
       this.phase = 'descending';
       this.elevatorLevel.phase = 'descending';

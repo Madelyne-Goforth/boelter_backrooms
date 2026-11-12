@@ -4,33 +4,26 @@ import { BoelterFloor } from './boelter_floor.js';
 import { HallCeiling } from './hall_ceiling.js';
 import { ScienceLab } from './science_lab.js';
 
-// Floor 2 = the base Boelter hall + ceiling clutter/flickering lights + the science lab.
-//
-//   boelter_floor.js  - hall walls, floor, ordinary doors, elevator doorway blocker
-//   hall_ceiling.js   - pipes, ducts, vents, flickering fixtures
-//   science_lab.js    - ajar door + lab room (where the escape puzzles go)
-//
-// main.js only talks to this class:
-//   const floor = new Floor2({ elevator, dialogue, player, inventory });
-//   scene.add(floor.group);
-//   player.setColliders(floor.colliders);
-//   ...in animate():  floor.update(delta);
+const LAB_DOOR_X = -17;   
+const HALL_AMBIENT = 0.10;        
+const HALL_ENVIRONMENT = 0.25;    
+const HALL_START_Z = 2.3;         
 
-const LAB_DOOR_X = -17;   // where along the hall the ajar door is (negative = player's right)
 
-// Out in the hall the scene's global ambient light + environment reflections are turned down,
-// otherwise they wash everything out and the flickering lights barely register.
-// The elevator keeps whatever lighting you set in main.js; these fade in once the player steps out.
-const HALL_AMBIENT = 0.10;        // AmbientLight intensity in the hall
-const HALL_ENVIRONMENT = 0.25;    // scene.environmentIntensity in the hall
-const HALL_START_Z = 2.3;         // player z past the elevator's front wall
+export const FLOOR_DROP = 0.65;
+const GATE_Z_MIN = 2.08;
+const GATE_Z_MAX = 2.32;
+const CRAWL_EYE_HEIGHT = 0.6;    
 
 export class Floor2 {
-  // inventory: the lab puzzle puts the key here. onLabEscape: runs when the player unlocks the lab door.
+ 
   constructor({ elevator, dialogue, player, inventory = null, onLabEscape = null }) {
     this.group = new THREE.Group();
+    this.group.visible = false;      
+    this.revealed = false;
+    this.floorY = 0;                 
+    this.elevator = elevator;
 
-    // base hall, with an opening cut into the far wall for the lab door
     this.hallFloor = new BoelterFloor({
       elevator,
       dialogue,
@@ -38,7 +31,6 @@ export class Floor2 {
     });
     this.group.add(this.hallFloor.group);
 
-    // one shared collider list: the player reads it, every piece pushes into it
     this.colliders = this.hallFloor.colliders;
 
     this.ceiling = new HallCeiling({
@@ -59,16 +51,24 @@ export class Floor2 {
     });
     this.group.add(this.lab.group);
 
+    const gap = elevator.doorWidth / 2;
+    this.gate = {
+      box: new THREE.Box3(
+        new THREE.Vector3(-gap, 0, GATE_Z_MIN),
+        new THREE.Vector3(gap, elevator.height, GATE_Z_MAX)
+      ),
+      solid: true
+    };
+    this.colliders.push(this.gate);
+
     this.player = player;
     this.mood = { ready: false, active: false, t: 0, scene: null, ambient: null, baseAmbient: 0, baseEnv: 1 };
   }
-
-  // fade the scene's global lighting between the elevator's look and the hall's darker look
   updateMood(delta) {
     const m = this.mood;
 
     if (!m.ready) {
-      const scene = this.group.parent;           // floor.group has been added to the scene by main.js
+      const scene = this.group.parent;          
       if (!scene) return;
       m.scene = scene;
       m.ambient = scene.children.find((c) => c.isAmbientLight) ?? null;
@@ -80,7 +80,6 @@ export class Floor2 {
     const outside = this.player.position.z > HALL_START_Z ? 1 : 0;
     m.t += (outside - m.t) * Math.min(1, delta * 3);
 
-    // don't touch the lights while the player is in the elevator, so its effects keep working
     if (m.t < 0.001 && !m.active) return;
     m.active = m.t >= 0.001;
 
@@ -88,14 +87,48 @@ export class Floor2 {
     m.scene.environmentIntensity = THREE.MathUtils.lerp(m.baseEnv, HALL_ENVIRONMENT, m.t);
   }
 
+  reveal() {
+    if (this.revealed) return this.floorY;
+
+    this.revealed = true;
+    this.floorY = this.elevator.group.position.y - FLOOR_DROP;
+    this.group.position.y = this.floorY;
+    this.group.visible = true;
+    return this.floorY;
+  }
+
+  // Crawl-out logic
+  updateCrawlExit(delta) {
+    const p = this.player;
+    const insideGate = p.position.z > GATE_Z_MIN && p.position.z < GATE_Z_MAX &&
+                       Math.abs(p.position.x) < this.elevator.doorWidth / 2;
+
+    if (insideGate) {
+      p.posture = 'prone';
+      this.gate.solid = false;
+    } else {
+      this.gate.solid = p.eyeHeight >= CRAWL_EYE_HEIGHT;
+    }
+
+    const carY = this.elevator.group.position.y;
+    const target = p.position.z > (GATE_Z_MIN + GATE_Z_MAX) / 2 ? this.floorY : carY;
+    const diff = target - p.groundY;
+    const step = 4 * delta;
+    p.groundY = Math.abs(diff) <= step ? target : p.groundY + Math.sign(diff) * step;
+  }
+
   update(delta = 0.016) {
     this.hallFloor.update();     // elevator doorway blocker
+
+    if (!this.revealed) {
+      this.hallFloor.doorBlock.solid = true;
+      return;
+    }
+
+    this.updateCrawlExit(delta);
     this.ceiling.update(delta);  // light flicker
     this.lab.update(delta);      // door + lab lights
     this.updateMood(delta);      // darker global lighting once outside the elevator
-
-    // once the player is sealed in the lab, the hall lights fade out
-    // (the lights have no shadows, so they'd otherwise leak through the walls and flicker in the lab)
     const target = this.lab.sealed ? 0 : 1;
     this.ceiling.master += (target - this.ceiling.master) * Math.min(1, delta * 5);
   }

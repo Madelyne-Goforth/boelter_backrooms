@@ -124,17 +124,11 @@ const lockerLevel = new LockerLevel({
   }
 });
 
-//show the lockers immediately.
-lockerLevel.start();
-
-// Combine hallway and locker collision boundaries.
 player.setColliders([
   ...floor.colliders,
   ...lockerLevel.colliders
 ]);
 
-
-// In-game clock
 class GameClock {
   constructor() {
     this.time = new Date(
@@ -167,14 +161,6 @@ const elevatorLevel = new ElevatorLevel({
   },
   onEscape: () => lockerLevel.start()
 });
-
-// DEV ONLY: skip the elevator puzzle so we can test the floor
-const DEV_SKIP_ELEVATOR = true;
-if (DEV_SKIP_ELEVATOR) {
-  elevatorLevel.phase = 'ready';   // unlocks the door buttons too
-  elevator.openDoors();
-}
-
 
 // Camera-mounted flashlight
 const flashlight = new THREE.SpotLight(
@@ -239,8 +225,23 @@ const elevatorWorkings = new ElevatorWorkings({
   camera,
   phone,
   dialogue,
-  ambientLight
+  ambientLight,
+
+  // The emergency doors just released: Floor 2 appears below the stuck elevator.
+  onEscaped: () => {
+    const floorY = floor.reveal();
+
+    // lockers were laid out for a hall at y = 0, so lower them with the hall
+    lockerLevel.objects.position.y = floorY;
+    lockerLevel.start();
+  }
 });
+
+// dev only so can skip
+const DEV_SKIP_TO_FLOOR2 = false;
+if (DEV_SKIP_TO_FLOOR2) {
+  elevatorWorkings.skipToEscape();
+}
 
 
 // Wiring puzzle
@@ -356,8 +357,6 @@ const interaction = new Interaction(
     }
 
     console.log('Interacted with:', data.id || data.kind);
-
-    // Objects that carry their own behavior (Floor 2 doors, lab props)
     if (typeof data.onInteract === 'function') {
       data.onInteract(data, object);
       return;
@@ -398,13 +397,10 @@ const interaction = new Interaction(
         return;
       }
 
-      // Main elevator workings handles floor travel
-      // and the binary override puzzle
       if (elevatorWorkings.handleButton(data)) {
         return;
       }
 
-      // Normal door controls before malfunction
       if (data.action === 'doorOpen') {
         if (elevatorWorkings.phase === 'ready') {
           elevator.openDoors();

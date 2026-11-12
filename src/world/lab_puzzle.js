@@ -1,21 +1,6 @@
 import * as THREE from 'three';
 import { makeInteractable } from './interactable.js';
 
-// ---------------------------------------------------------------------------
-// Science lab puzzle: mix dyes -> feed samples to the fume hood lock -> take the key.
-//
-//   1. The whiteboard shows three colored samples in order (SOLUTION below).
-//   2. Only the three primary dyes are on the bench, so the player has to MIX the rest:
-//        red + yellow = orange     yellow + blue = green     red + blue = purple
-//      (one dye alone makes that primary; two dyes make a mix; the beaker holds 2)
-//   3. Interacting with the beaker pours the sample into the intake. That fills the next
-//      lamp on the hood's lock. After the third sample the lock checks the order.
-//   4. Right: the sash rises and a key is revealed. Wrong: the lock buzzes and resets.
-//   5. The key goes in the hotbar and unlocks the lab door (handled in science_lab.js).
-//
-// To change the answer, edit SOLUTION. The whiteboard picture updates automatically.
-// ---------------------------------------------------------------------------
-
 export const DYE_HEX = { red: 0xd32f2f, yellow: 0xfdd835, blue: 0x1e66d0 };
 export const MIX_HEX = { ...DYE_HEX, orange: 0xff8f00, green: 0x2e9d3f, purple: 0x7b3fb5 };
 
@@ -34,8 +19,6 @@ const MIX_TABLE = {
 
 const BEAKER_MAX = 2;
 const SASH_LIFT = 0.7;
-
-// tiny inline SVG so the hotbar icon needs no asset file
 const KEY_ICON =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
@@ -54,13 +37,13 @@ export class LabPuzzle {
     this.dialogue = lab.dialogue;
     this.inventory = lab.inventory;
 
-    this.beaker = [];          // dyes currently in the mixing beaker (max 2)
+    this.beaker = [];          
     this.slots = [null, null, null];
     this.solved = false;
     this.keyTaken = false;
 
-    this.flash = null;         // { hex, t } while the lamps blink
-    this.sashLift = 0;         // current lift of the sash (0 .. SASH_LIFT)
+    this.flash = null;         
+    this.sashLift = 0;         
 
     this.buildStation();
     this.buildLockPanel();
@@ -69,8 +52,6 @@ export class LabPuzzle {
     this.refreshLamps();
   }
 
-  // Small props are hard to hit with a crosshair, so each gets an invisible, larger hitbox.
-  // (A material with visible:false is still hit by the raycaster.)
   addHitbox(parent, w, h, d, x = 0, y = 0, z = 0) {
     const hit = new THREE.Mesh(
       new THREE.BoxGeometry(w, h, d),
@@ -85,14 +66,14 @@ export class LabPuzzle {
     this.dialogue.show(lines, 'LAB', type);
   }
 
-  // ------------------------------------------------------------------ station
+//station
 
   buildStation() {
     const { doorX, z1 } = this.lab;
     const topY = 0.9;
     const z = z1 - 0.32;
 
-    // three dye bottles
+    // dye bottles
     const bottleXs = { red: doorX + 1.35, yellow: doorX + 1.75, blue: doorX + 2.15 };
     for (const [name, x] of Object.entries(bottleXs)) {
       this.buildBottle(name, x, topY, z);
@@ -102,10 +83,10 @@ export class LabPuzzle {
     this.beakerX = doorX + 2.8;
     this.buildBeaker(this.beakerX, topY, z);
 
-    // intake funnel the sample is poured into
+    // funnel sample is poured into
     const funnelX = doorX + 3.45;
     const funnel = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.12, 20, 1, true), this.lab.steelMat);
-    funnel.rotation.x = Math.PI;                  // wide end up
+    funnel.rotation.x = Math.PI;                  
     funnel.position.set(funnelX, topY + 0.14, z);
     funnel.material = funnel.material.clone();
     funnel.material.side = THREE.DoubleSide;
@@ -115,11 +96,10 @@ export class LabPuzzle {
     stem.position.set(funnelX, topY + 0.05, z);
     this.group.add(stem);
 
-    // conduit from the intake across the back wall into the hood
+
     this.lab.block(doorX + this.lab.hood.w / 2, funnelX + 0.02, 1.22, 1.28, z1 - 0.05, z1 - 0.02, this.lab.steelMat);
     this.lab.block(funnelX - 0.02, funnelX + 0.02, topY + 0.15, 1.28, z1 - 0.05, z1 - 0.02, this.lab.steelMat);
 
-    // sign above the intake
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(0.5, 0.12),
       new THREE.MeshStandardMaterial({
@@ -169,7 +149,7 @@ export class LabPuzzle {
         roughness: 0.7
       })
     );
-    label.rotation.y = Math.PI;                 // faces the player (-z)
+    label.rotation.y = Math.PI;                 
     label.position.set(0, 0.1, -0.057);
 
     g.add(body, liquid, neck, cap, label);
@@ -211,7 +191,7 @@ export class LabPuzzle {
     });
   }
 
-  // ------------------------------------------------------------------ mixing
+  // mixing
 
   mixName(list = this.beaker) {
     if (!list.length) return null;
@@ -281,7 +261,7 @@ export class LabPuzzle {
     this.checkLock();
   }
 
-  // ------------------------------------------------------------------ the hood lock
+  // fume hood lock
 
   buildLockPanel() {
     const { doorX } = this.lab;
@@ -304,7 +284,7 @@ export class LabPuzzle {
         roughness: 0.5
       })
     );
-    plate.rotation.y = Math.PI;                  // faces the player (-z)
+    plate.rotation.y = Math.PI;                 
     plate.position.set(doorX, y, frontZ - 0.003);
     panel.add(plate);
 
@@ -385,7 +365,7 @@ export class LabPuzzle {
     }
   }
 
-  // ------------------------------------------------------------------ the key
+  // key
 
   buildKey() {
     const { doorX, z1 } = this.lab;
@@ -409,8 +389,6 @@ export class LabPuzzle {
     this.group.add(key);
     this.keyMesh = key;
 
-    // The sash glass is a solid, non-interactable mesh, so the raycast can't reach the key
-    // until the sash has been lifted. No extra gating needed.
     makeInteractable(key, {
       kind: 'labKey',
       id: KEY_ID,
@@ -440,10 +418,7 @@ export class LabPuzzle {
     this.say(["A brass key, tagged \"LAB DOOR\".", "That's my way out."]);
   }
 
-  // ------------------------------------------------------------------ per-frame
-
   update(delta) {
-    // lamps blink after the third sample, then the result applies
     if (this.flash) {
       this.flash.t -= delta;
       const on = Math.floor(this.flash.t * 8) % 2 === 0;
@@ -473,7 +448,6 @@ export class LabPuzzle {
       }
     }
 
-    // sash rises once solved
     if (this.solved && this.sashLift < SASH_LIFT) {
       this.sashLift = Math.min(SASH_LIFT, this.sashLift + delta * 0.35);
       this.lab.hoodSash.position.y = this.lab.hoodSashY + this.sashLift;

@@ -248,8 +248,7 @@ export class Player {
       this.position.z = elevatorFront;
     }
 
-    // Keep the player inside the elevator's side walls
-    // until they cross the doorway
+    // Keep the player inside the elevator's side walls til doorway
     if (this.position.z <= elevatorFront) {
       this.position.x = THREE.MathUtils.clamp(
         this.position.x,
@@ -264,7 +263,6 @@ export class Player {
     }
 
     // Floor 2 placeholder platform boundaries
-    // Platform spans X -3.5 to 3.5 and Z 2.1 to 8.1
     if (this.hasExitedElevator) {
       const roomMaxX = 3.5 - this.radius;
       const roomMaxZ = 8.1 - this.radius;
@@ -280,8 +278,7 @@ export class Player {
         roomMaxZ
       );
 
-      // Prevent walking through the elevator's
-      // side walls when returning from the room
+      // Prevent walking through the elevator's side walls
       if (
         this.position.z < elevatorFront &&
         Math.abs(this.position.x) > doorHalfWidth
@@ -317,11 +314,10 @@ export class Player {
       this.eyeHeight += Math.sign(difference) * step;
     }
 
-    // Ground height is the source of truth
     this.camera.position.y =
       this.groundY + this.eyeHeight;
 
-    // Temporary camera shake
+    // Temp camera shake
     if (this.shakeTime > 0) {
       this.shakeTime = Math.max(
         0,
@@ -353,13 +349,11 @@ export class Player {
     const p = this.position;
     const r = this.radius;
 
-    // a few passes so corners don't let you slip through
     for (let pass = 0; pass < 3; pass++) {
       for (const c of this.colliders) {
         if (!c.solid) continue;
         const b = c.box;
 
-        // closest point on the wall rectangle (top-down, ignoring y)
         const cx = THREE.MathUtils.clamp(p.x, b.min.x, b.max.x);
         const cz = THREE.MathUtils.clamp(p.z, b.min.z, b.max.z);
         const dx = p.x - cx;
@@ -373,7 +367,6 @@ export class Player {
           p.x += dx * push;
           p.z += dz * push;
         } else {
-          // center ended up inside the box: eject along the shortest way out
           const opts = [
             [p.x - b.min.x, () => (p.x = b.min.x - r)],
             [b.max.x - p.x, () => (p.x = b.max.x + r)],
