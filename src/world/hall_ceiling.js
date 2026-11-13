@@ -65,12 +65,11 @@ export class HallCeiling {
     const white  = this.mat(0xf2f2f0, { roughness: 0.6 });
     const clamp  = this.mat(0x2a2a2a, { metalness: 0.6, roughness: 0.4 });
 
-    this.pipe(0.07,  xRight + 0.2, xLeft - 0.2, H - 0.30, zBase,        white);  // insulated main
+    this.pipe(0.07,  xRight + 0.2, xLeft - 0.2, H - 0.30, zBase,        white);  
     this.pipe(0.035, xRight + 0.2, xLeft - 0.2, H - 0.18, zBase + 0.22, copper);
     this.pipe(0.03,  xRight + 0.2, xLeft - 0.2, H - 0.14, zBase + 0.34, red);
     this.pipe(0.03,  xRight + 0.2, xLeft - 0.2, H - 0.14, zBase + 0.44, blue);
 
-    // hangers every 2.5 m: thin rod + a clamp around the white pipe
     for (let x = xLeft - 1; x > xRight + 1; x -= 2.5) {
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 6), clamp);
       rod.position.set(x, H - 0.15, zBase);

@@ -10,13 +10,10 @@ export class BoelterFloor {
     this.doorways = doorways;
     this.group = new THREE.Group();
     this.colliders = [];
-
     this.wallH = elevator.height;          
-
     this.wallMat  = new THREE.MeshStandardMaterial({ color: 0xf1eee2, roughness: 0.9 });
     this.floorMat = new THREE.MeshStandardMaterial({ color: 0x9d978c, roughness: 0.3, metalness: 0.1 });
     this.doorMat  = new THREE.MeshStandardMaterial({ color: 0xc98a4b, roughness: 0.6 });
-
     this.buildElevatorShellColliders();
     this.buildCorridor();
     this.buildLights();
