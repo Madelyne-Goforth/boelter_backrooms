@@ -1,15 +1,5 @@
 import * as THREE from 'three';
 
-// Ceiling clutter + flickering lights for the hall built by BoelterFloor.
-// Usage:
-//   const ceiling = new HallCeiling({ hall: boelterFloor.hall, height: elevator.height });
-//   scene.add(ceiling.group);
-//   ...in animate():  ceiling.update(delta);
-//
-// Flicker modes (edit FIXTURE_PLAN below to change which lights do what):
-//   'steady'   - always on
-//   'flicker'  - on, but stutters in short bursts every few seconds
-//   'dying'    - mostly OFF, with occasional brief flashes of light
 const FIXTURE_PLAN = [
   { x:   5.0, mode: 'steady'  },
   { x:  -4.0, mode: 'flicker' },
@@ -30,7 +20,7 @@ export class HallCeiling {
     this.H = height;
     this.group = new THREE.Group();
     this.fixtures = [];
-    this.master = 1;          // 0..1 dimmer for every hall light (Floor2 turns it down when the player is sealed in the lab)
+    this.master = 1;          
 
     const { z0, zFar } = hall;
     this.zMid = (z0 + zFar) / 2;
@@ -53,7 +43,6 @@ export class HallCeiling {
     return m;
   }
 
-  // cylinder running along x
   pipe(radius, x1, x2, y, z, material) {
     const m = new THREE.Mesh(
       new THREE.CylinderGeometry(radius, radius, Math.abs(x2 - x1), 16),
@@ -65,7 +54,6 @@ export class HallCeiling {
     return m;
   }
 
-  // ---------------- pipes along the elevator-side (near) wall ----------------
   buildPipes() {
     const { z0, xRight, xLeft } = this.hall;
     const H = this.H;
@@ -90,13 +78,10 @@ export class HallCeiling {
       this.box(0.04, 0.05, 0.18, clamp, x, H - 0.30 - 0.07, zBase);
     }
 
-    // a pipe that dips down and disappears into the wall (like the one in the photo)
     const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.1, 12), copper);
     drop.position.set(xRight + 5, H - 0.8, z0 + 0.12);
     this.group.add(drop);
   }
-
-  // ---------------- big duct along the far wall ----------------
   buildMainDuct() {
     const { zFar, xRight, xLeft } = this.hall;
     const H = this.H;
@@ -109,17 +94,15 @@ export class HallCeiling {
     const x0 = xRight + 0.1, x1 = xLeft - 0.1;
     this.box(x1 - x0, h, w, ductMat, (x0 + x1) / 2, y, z);
 
-    // seams every 3 m
     for (let x = x1 - 1.5; x > x0; x -= 3) {
       this.box(0.04, h + 0.02, w + 0.02, seamMat, x, y, z);
     }
-    // two access panels on the underside
+
     for (const x of [-9, -22]) {
       this.box(0.5, 0.012, 0.35, dark, x, H - h - 0.004, z);
     }
   }
 
-  // ---------------- ducts that cross the hall and hang lower ----------------
   buildCrossDucts() {
     const { z0, zFar } = this.hall;
     const H = this.H;
@@ -129,13 +112,11 @@ export class HallCeiling {
     const h = 0.8;
     for (const x of [-16, -25]) {
       this.box(1.3, h, depth, ductMat, x, H - h / 2, (z0 + zFar) / 2);
-      // flanges
       this.box(1.36, h + 0.04, 0.03, this.mat(0xcfcfca), x, H - h / 2, z0 + 0.02);
       this.box(1.36, h + 0.04, 0.03, this.mat(0xcfcfca), x, H - h / 2, zFar - 0.02);
     }
   }
 
-  // ---------------- ceiling vent grilles ----------------
   buildVents() {
     const H = this.H;
     const frame = this.mat(0xdcdcd6, { roughness: 0.7 });
@@ -153,7 +134,6 @@ export class HallCeiling {
     }
   }
 
-  // ---------------- flickering light fixtures ----------------
   buildFixtures(plan) {
     const H = this.H;
     const housing = this.mat(0xdddddd, { roughness: 0.6 });
@@ -161,7 +141,6 @@ export class HallCeiling {
     for (const spec of plan) {
       const settings = MODE_SETTINGS[spec.mode] ?? MODE_SETTINGS.steady;
 
-      // each fixture gets its own emissive material so it can dim on its own
       const tube = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: 0xfff2d8,
@@ -169,11 +148,11 @@ export class HallCeiling {
         roughness: 0.4
       });
 
-      const z = this.zMid - 0.1;   // clear of the main duct (far side) and pipes (near side)
+      const z = this.zMid - 0.1;   
       const y = H - 0.05;
 
-      this.box(0.35, 0.06, 1.3, housing, spec.x, y, z);                 // housing
-      const lamp = this.box(0.22, 0.03, 1.15, tube, spec.x, y - 0.04, z); // glowing tube
+      this.box(0.35, 0.06, 1.3, housing, spec.x, y, z);                 
+      const lamp = this.box(0.22, 0.03, 1.15, tube, spec.x, y - 0.04, z); 
 
       const light = new THREE.PointLight(0xfff0d8, 16, 13, 1.5);
       light.position.set(spec.x, H - 0.45, z);
@@ -190,7 +169,6 @@ export class HallCeiling {
         timer: settings.gapMin + Math.random() * settings.gapRange
       });
 
-      // 'dying' lights start off
       if (!settings.restOn) {
         const f = this.fixtures[this.fixtures.length - 1];
         f.on = false;
@@ -200,7 +178,6 @@ export class HallCeiling {
   }
 
   apply(f) {
-    // a lit tube is full brightness; an unlit one keeps a faint glow
     const v = (f.on ? 1 : 0.03) * this.master;
     f.light.intensity = f.baseIntensity * v;
     f.tube.emissiveIntensity = f.baseEmissive * v;
@@ -216,7 +193,6 @@ export class HallCeiling {
       const s = f.settings;
 
       if (f.burstLeft > 0) {
-        // mid-burst: toggle rapidly
         f.on = Math.random() < s.onChance;
         f.burstLeft--;
         f.timer = 0.03 + Math.random() * 0.09;
@@ -226,7 +202,6 @@ export class HallCeiling {
           f.timer = s.gapMin + Math.random() * s.gapRange;
         }
       } else {
-        // start a new burst
         const [lo, hi] = s.burst;
         f.burstLeft = lo + Math.floor(Math.random() * (hi - lo + 1));
         f.timer = 0.02;

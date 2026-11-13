@@ -372,8 +372,6 @@ export class ScienceLab {
   buildWhiteboard(x, z) {
     const tex = this.makeCanvasTexture(1024, 512, (g, w, h) => {
       g.fillStyle = '#f4f5f2'; g.fillRect(0, 0, w, h);
-
-      // ghosting from old erased writing
       g.fillStyle = 'rgba(0,0,0,0.05)';
       for (let i = 0; i < 14; i++) g.fillRect(40 + Math.random() * 900, 30 + Math.random() * 440, 120 + Math.random() * 200, 8);
 

@@ -96,8 +96,6 @@ export class Floor2 {
     this.group.visible = true;
     return this.floorY;
   }
-
-  // Crawl-out logic
   updateCrawlExit(delta) {
     const p = this.player;
     const insideGate = p.position.z > GATE_Z_MIN && p.position.z < GATE_Z_MAX &&
@@ -118,17 +116,16 @@ export class Floor2 {
   }
 
   update(delta = 0.016) {
-    this.hallFloor.update();     // elevator doorway blocker
+    this.hallFloor.update();     
 
     if (!this.revealed) {
       this.hallFloor.doorBlock.solid = true;
       return;
     }
-
     this.updateCrawlExit(delta);
-    this.ceiling.update(delta);  // light flicker
-    this.lab.update(delta);      // door + lab lights
-    this.updateMood(delta);      // darker global lighting once outside the elevator
+    this.ceiling.update(delta);  
+    this.lab.update(delta);     
+    this.updateMood(delta);     
     const target = this.lab.sealed ? 0 : 1;
     this.ceiling.master += (target - this.ceiling.master) * Math.min(1, delta * 5);
   }
